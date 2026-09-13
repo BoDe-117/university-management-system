@@ -6,6 +6,7 @@ import com.abdulrahman.university_management_system.department.entity.Department
 import com.abdulrahman.university_management_system.department.exception.DepartmentCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
 import com.abdulrahman.university_management_system.department.repository.DepartmentRepository;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -13,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -68,15 +70,37 @@ class DepartmentServiceTest {
     void createDepartment_throwsConflict_whenDatabaseRejectsDuplicateCode() {
         CreateDepartmentRequest request = new CreateDepartmentRequest("CS", "Computer Science");
 
-        when(departmentRepository.existsByCode("CS"))
-                .thenReturn(false)
-                .thenReturn(true);
+        when(departmentRepository.existsByCode("CS")).thenReturn(false);
+
+        ConstraintViolationException hibernateEx = new ConstraintViolationException(
+                "duplicate key",
+                new SQLException(),
+                "departments_code_key"
+        );
         when(departmentRepository.saveAndFlush(any(Department.class)))
-                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+                .thenThrow(new DataIntegrityViolationException("duplicate key", hibernateEx));
 
         assertThatThrownBy(() -> departmentService.createDepartment(request))
                 .isInstanceOf(DepartmentCodeAlreadyExistsException.class)
                 .hasMessageContaining("CS");
+    }
+
+    @Test
+    void createDepartment_rethrowsException_whenConstraintIsNotDuplicateCode() {
+        CreateDepartmentRequest request = new CreateDepartmentRequest("CS", "Computer Science");
+
+        when(departmentRepository.existsByCode("CS")).thenReturn(false);
+
+        ConstraintViolationException hibernateEx = new ConstraintViolationException(
+                "some other constraint",
+                new SQLException(),
+                "some_other_constraint_name"
+        );
+        when(departmentRepository.saveAndFlush(any(Department.class)))
+                .thenThrow(new DataIntegrityViolationException("some other constraint", hibernateEx));
+
+        assertThatThrownBy(() -> departmentService.createDepartment(request))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test

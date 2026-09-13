@@ -6,6 +6,7 @@ import com.abdulrahman.university_management_system.department.entity.Department
 import com.abdulrahman.university_management_system.department.exception.DepartmentCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
 import com.abdulrahman.university_management_system.department.repository.DepartmentRepository;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,8 @@ import java.util.UUID;
 
 @Service
 public class DepartmentService {
+
+    private static final String DEPARTMENT_CODE_UNIQUE_CONSTRAINT = "departments_code_key";
 
     private final DepartmentRepository departmentRepository;
 
@@ -34,7 +37,7 @@ public class DepartmentService {
             Department saved = departmentRepository.saveAndFlush(department);
             return toResponse(saved);
         } catch (DataIntegrityViolationException e) {
-            if (departmentRepository.existsByCode(request.code())) {
+            if (isDuplicateCodeViolation(e)) {
                 throw new DepartmentCodeAlreadyExistsException(request.code());
             }
             throw e;
@@ -54,6 +57,13 @@ public class DepartmentService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private boolean isDuplicateCodeViolation(DataIntegrityViolationException e) {
+        if (e.getCause() instanceof ConstraintViolationException cve) {
+            return DEPARTMENT_CODE_UNIQUE_CONSTRAINT.equals(cve.getConstraintName());
+        }
+        return false;
     }
 
     private DepartmentResponse toResponse(Department department) {
