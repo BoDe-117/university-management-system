@@ -8,6 +8,7 @@ import com.abdulrahman.university_management_system.department.exception.Departm
 import com.abdulrahman.university_management_system.department.repository.DepartmentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.UUID;
@@ -28,8 +29,13 @@ public class DepartmentService {
         }
 
         Department department = new Department(request.code(), request.name());
-        Department saved = departmentRepository.save(department);
-        return toResponse(saved);
+
+        try {
+            Department saved = departmentRepository.save(department);
+            return toResponse(saved);
+        } catch (DataIntegrityViolationException e) {
+            throw new DepartmentCodeAlreadyExistsException(request.code());
+        }
     }
 
     @Transactional(readOnly = true)

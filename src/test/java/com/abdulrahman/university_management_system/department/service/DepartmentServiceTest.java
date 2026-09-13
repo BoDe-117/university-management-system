@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class DepartmentServiceTest {
@@ -104,6 +105,19 @@ class DepartmentServiceTest {
         assertThat(responses).hasSize(2);
         assertThat(responses).extracting(DepartmentResponse::code)
                 .containsExactlyInAnyOrder("CS", "SE");
+    }
+
+    @Test
+    void createDepartment_throwsConflict_whenDatabaseRejectsDuplicateCode() {
+        CreateDepartmentRequest request = new CreateDepartmentRequest("CS", "Computer Science");
+
+        when(departmentRepository.existsByCode("CS")).thenReturn(false);
+        when(departmentRepository.save(any(Department.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"));
+
+        assertThatThrownBy(() -> departmentService.createDepartment(request))
+                .isInstanceOf(DepartmentCodeAlreadyExistsException.class)
+                .hasMessageContaining("CS");
     }
 
     // Department deliberately has no setters for id/createdAt/updatedAt —
