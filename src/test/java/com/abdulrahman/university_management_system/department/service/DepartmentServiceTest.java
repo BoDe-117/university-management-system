@@ -9,6 +9,7 @@ import com.abdulrahman.university_management_system.department.repository.Depart
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,12 +38,19 @@ class DepartmentServiceTest {
     @InjectMocks
     private DepartmentService departmentService;
 
+    // ── create: happy path ──────────────────────────────────────────────
+
     @Test
     void createDepartment_savesAndReturnsResponse_whenCodeIsUnique() {
         CreateDepartmentRequest request = new CreateDepartmentRequest("CS", "Computer Science");
+
+        UUID expectedId = UUID.randomUUID();
+        Instant expectedCreatedAt = Instant.now();
+        Instant expectedUpdatedAt = Instant.now();
+
         Department saved = new Department("CS", "Computer Science");
-        setId(saved, UUID.randomUUID());
-        setTimestamps(saved, Instant.now(), Instant.now());
+        setId(saved, expectedId);
+        setTimestamps(saved, expectedCreatedAt, expectedUpdatedAt);
 
         when(departmentRepository.existsByCode("CS")).thenReturn(false);
         when(departmentRepository.saveAndFlush(any(Department.class))).thenReturn(saved);
@@ -50,9 +59,33 @@ class DepartmentServiceTest {
 
         assertThat(response.code()).isEqualTo("CS");
         assertThat(response.name()).isEqualTo("Computer Science");
-        assertThat(response.id()).isNotNull();
-        verify(departmentRepository).saveAndFlush(any(Department.class));
+        assertThat(response.id()).isEqualTo(expectedId);
+        assertThat(response.createdAt()).isEqualTo(expectedCreatedAt);
+        assertThat(response.updatedAt()).isEqualTo(expectedUpdatedAt);
     }
+
+    @Test
+    void createDepartment_passesCorrectCodeAndNameToRepository() {
+        CreateDepartmentRequest request = new CreateDepartmentRequest("SE", "Software Engineering");
+
+        Department saved = new Department("SE", "Software Engineering");
+        setId(saved, UUID.randomUUID());
+        setTimestamps(saved, Instant.now(), Instant.now());
+
+        when(departmentRepository.existsByCode("SE")).thenReturn(false);
+        when(departmentRepository.saveAndFlush(any(Department.class))).thenReturn(saved);
+
+        departmentService.createDepartment(request);
+
+        ArgumentCaptor<Department> captor = ArgumentCaptor.forClass(Department.class);
+        verify(departmentRepository).saveAndFlush(captor.capture());
+
+        Department captured = captor.getValue();
+        assertThat(captured.getCode()).isEqualTo("SE");
+        assertThat(captured.getName()).isEqualTo("Software Engineering");
+    }
+
+    // ── create: pre-check duplicate ─────────────────────────────────────
 
     @Test
     void createDepartment_throwsConflict_whenCodeAlreadyExists() {
@@ -65,6 +98,8 @@ class DepartmentServiceTest {
 
         verify(departmentRepository, never()).saveAndFlush(any());
     }
+
+    // ── create: race condition — known constraint ───────────────────────
 
     @Test
     void createDepartment_throwsConflict_whenDatabaseRejectsDuplicateCode() {
@@ -83,7 +118,11 @@ class DepartmentServiceTest {
         assertThatThrownBy(() -> departmentService.createDepartment(request))
                 .isInstanceOf(DepartmentCodeAlreadyExistsException.class)
                 .hasMessageContaining("CS");
+
+        verify(departmentRepository, times(1)).existsByCode("CS");
     }
+
+    // ── create: race condition — unknown constraint ─────────────────────
 
     @Test
     void createDepartment_rethrowsException_whenConstraintIsNotDuplicateCode() {
@@ -96,12 +135,55 @@ class DepartmentServiceTest {
                 new SQLException(),
                 "some_other_constraint_name"
         );
-        when(departmentRepository.saveAndFlush(any(Department.class)))
-                .thenThrow(new DataIntegrityViolationException("some other constraint", hibernateEx));
+        DataIntegrityViolationException original = new DataIntegrityViolationException(
+                "some other constraint", hibernateEx);
+
+        when(departmentRepository.saveAndFlush(any(Department.class))).thenThrow(original);
 
         assertThatThrownBy(() -> departmentService.createDepartment(request))
-                .isInstanceOf(DataIntegrityViolationException.class);
+                .isSameAs(original);
     }
+
+    // ── create: race condition — no ConstraintViolationException cause ──
+
+    @Test
+    void createDepartment_rethrowsException_whenCauseIsNotConstraintViolation() {
+        CreateDepartmentRequest request = new CreateDepartmentRequest("CS", "Computer Science");
+
+        when(departmentRepository.existsByCode("CS")).thenReturn(false);
+
+        DataIntegrityViolationException original = new DataIntegrityViolationException(
+                "unexpected error", new RuntimeException("not a constraint violation"));
+
+        when(departmentRepository.saveAndFlush(any(Department.class))).thenThrow(original);
+
+        assertThatThrownBy(() -> departmentService.createDepartment(request))
+                .isSameAs(original);
+    }
+
+    // ── create: race condition — null constraint name ───────────────────
+
+    @Test
+    void createDepartment_rethrowsException_whenConstraintNameIsNull() {
+        CreateDepartmentRequest request = new CreateDepartmentRequest("CS", "Computer Science");
+
+        when(departmentRepository.existsByCode("CS")).thenReturn(false);
+
+        ConstraintViolationException hibernateEx = new ConstraintViolationException(
+                "constraint violation",
+                new SQLException(),
+                null
+        );
+        DataIntegrityViolationException original = new DataIntegrityViolationException(
+                "constraint violation", hibernateEx);
+
+        when(departmentRepository.saveAndFlush(any(Department.class))).thenThrow(original);
+
+        assertThatThrownBy(() -> departmentService.createDepartment(request))
+                .isSameAs(original);
+    }
+
+    // ── get by ID ───────────────────────────────────────────────────────
 
     @Test
     void getDepartmentById_returnsResponse_whenDepartmentExists() {
@@ -127,6 +209,8 @@ class DepartmentServiceTest {
                 .isInstanceOf(DepartmentNotFoundException.class);
     }
 
+    // ── list all ────────────────────────────────────────────────────────
+
     @Test
     void getAllDepartments_returnsMappedList() {
         Department cs = new Department("CS", "Computer Science");
@@ -145,6 +229,8 @@ class DepartmentServiceTest {
         assertThat(responses).extracting(DepartmentResponse::code)
                 .containsExactlyInAnyOrder("CS", "SE");
     }
+
+    // ── helpers ─────────────────────────────────────────────────────────
 
     private void setId(Department department, UUID id) {
         setField(department, "id", id);
@@ -165,3 +251,4 @@ class DepartmentServiceTest {
         }
     }
 }
+
