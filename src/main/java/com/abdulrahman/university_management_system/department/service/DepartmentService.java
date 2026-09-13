@@ -6,9 +6,9 @@ import com.abdulrahman.university_management_system.department.entity.Department
 import com.abdulrahman.university_management_system.department.exception.DepartmentCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
 import com.abdulrahman.university_management_system.department.repository.DepartmentRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.List;
 import java.util.UUID;
@@ -31,10 +31,13 @@ public class DepartmentService {
         Department department = new Department(request.code(), request.name());
 
         try {
-            Department saved = departmentRepository.save(department);
+            Department saved = departmentRepository.saveAndFlush(department);
             return toResponse(saved);
         } catch (DataIntegrityViolationException e) {
-            throw new DepartmentCodeAlreadyExistsException(request.code());
+            if (departmentRepository.existsByCode(request.code())) {
+                throw new DepartmentCodeAlreadyExistsException(request.code());
+            }
+            throw e;
         }
     }
 

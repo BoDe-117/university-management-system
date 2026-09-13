@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Instant;
 import java.util.List;
@@ -23,7 +24,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class DepartmentServiceTest {
@@ -42,14 +42,14 @@ class DepartmentServiceTest {
         setTimestamps(saved, Instant.now(), Instant.now());
 
         when(departmentRepository.existsByCode("CS")).thenReturn(false);
-        when(departmentRepository.save(any(Department.class))).thenReturn(saved);
+        when(departmentRepository.saveAndFlush(any(Department.class))).thenReturn(saved);
 
         DepartmentResponse response = departmentService.createDepartment(request);
 
         assertThat(response.code()).isEqualTo("CS");
         assertThat(response.name()).isEqualTo("Computer Science");
         assertThat(response.id()).isNotNull();
-        verify(departmentRepository).save(any(Department.class));
+        verify(departmentRepository).saveAndFlush(any(Department.class));
     }
 
     @Test
@@ -61,7 +61,22 @@ class DepartmentServiceTest {
                 .isInstanceOf(DepartmentCodeAlreadyExistsException.class)
                 .hasMessageContaining("CS");
 
-        verify(departmentRepository, never()).save(any());
+        verify(departmentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createDepartment_throwsConflict_whenDatabaseRejectsDuplicateCode() {
+        CreateDepartmentRequest request = new CreateDepartmentRequest("CS", "Computer Science");
+
+        when(departmentRepository.existsByCode("CS"))
+                .thenReturn(false)
+                .thenReturn(true);
+        when(departmentRepository.saveAndFlush(any(Department.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        assertThatThrownBy(() -> departmentService.createDepartment(request))
+                .isInstanceOf(DepartmentCodeAlreadyExistsException.class)
+                .hasMessageContaining("CS");
     }
 
     @Test
@@ -107,24 +122,6 @@ class DepartmentServiceTest {
                 .containsExactlyInAnyOrder("CS", "SE");
     }
 
-    @Test
-    void createDepartment_throwsConflict_whenDatabaseRejectsDuplicateCode() {
-        CreateDepartmentRequest request = new CreateDepartmentRequest("CS", "Computer Science");
-
-        when(departmentRepository.existsByCode("CS")).thenReturn(false);
-        when(departmentRepository.save(any(Department.class)))
-                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"));
-
-        assertThatThrownBy(() -> departmentService.createDepartment(request))
-                .isInstanceOf(DepartmentCodeAlreadyExistsException.class)
-                .hasMessageContaining("CS");
-    }
-
-    // Department deliberately has no setters for id/createdAt/updatedAt —
-    // that's good encapsulation in production code, but it means tests need
-    // another way to build a "realistic, already-saved" Department. Reflection
-    // mirrors exactly what Hibernate itself does at runtime to populate these
-    // fields, so it's a reasonable, common trade-off here.
     private void setId(Department department, UUID id) {
         setField(department, "id", id);
     }
