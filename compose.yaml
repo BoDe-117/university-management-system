@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: ums-postgres
+    environment:
+      POSTGRES_DB: ums_dev
+      POSTGRES_USER: ums_user
+      POSTGRES_PASSWORD: ums_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - ums-postgres-data:/var/lib/postgresql
+
+volumes:
+  ums-postgres-data:
