@@ -1,23 +1,52 @@
 # University Management System
 
-A production-style REST API for managing university departments, programs, courses, enrollment, and more — built as a portfolio project demonstrating backend engineering with Java and Spring Boot.
+A university management REST API built as a portfolio project using Java, Spring Boot, and PostgreSQL.
+
+Department management is currently implemented. Program management, courses, and enrollment are planned.
+
+## Current Features
+
+- Create a department.
+- Retrieve a department by ID.
+- List all departments.
+- Validate required fields and field lengths.
+- Enforce unique department codes in PostgreSQL.
+- Translate duplicate-code conflicts into HTTP `409`, including concurrent creation attempts.
+- Return structured errors for supported Department validation and lookup failures.
 
 ## Tech Stack
 
-- **Java 25** (LTS)
-- **Spring Boot 4.1.1** (Web MVC, Data JPA, Validation, Actuator)
-- **PostgreSQL 18** (via Docker)
-- **Hibernate 7** (ORM)
-- **Flyway** (database migrations)
-- **JUnit 5 + Mockito** (unit tests)
-- **Testcontainers** (PostgreSQL integration tests)
-- **Maven** (build tool with Maven Wrapper)
+- Java 25 target
+- Spring Boot 4.1.1
+- Spring Web MVC
+- Spring Data JPA and Hibernate
+- PostgreSQL 18
+- Flyway
+- JUnit and Mockito
+- MockMvc
+- Testcontainers 2
+- Maven with Maven Wrapper
+- GitHub Actions
 
 ## Prerequisites
 
-- **Java 25+** — verify with `java -version`
-- **Docker Desktop** — required for the local PostgreSQL database and integration tests
-- **Git** — for cloning the repository
+- JDK 25 to match the CI configuration.
+- Docker Desktop, or a compatible Docker environment, running Linux containers.
+- Git.
+
+Check the Java version Maven actually uses:
+
+```powershell
+.\mvnw.cmd -version
+```
+
+On Linux or macOS:
+
+```bash
+./mvnw -version
+```
+
+The project targets Java 25. Maven's runtime JDK is determined by your local environment, including `JAVA_HOME`.
 
 ## Getting Started
 
@@ -28,61 +57,139 @@ git clone https://github.com/BoDe-117/university-management-system.git
 cd university-management-system
 ```
 
-### 2. Start PostgreSQL
+### 2. Start the development database
 
 ```bash
 docker compose up -d
 ```
 
-This starts a PostgreSQL 18 container with:
-- Database: `ums_dev`
-- Username: `ums_user`
-- Password: `ums_pass`
-- Port: `5432`
+The development database uses:
 
-These are local development defaults — not production credentials.
+| Setting | Value |
+|---------|-------|
+| PostgreSQL image | `postgres:18` |
+| Database | `ums_dev` |
+| Username | `ums_user` |
+| Password | `ums_pass` |
+| Host port | `5432` |
+
+These credentials are local development defaults. Do not reuse them for a production deployment.
+
+Flyway applies database migrations when the application starts. Hibernate validates that the database schema matches the entity mappings.
 
 ### 3. Run the application
 
-```bash
-./mvnw spring-boot:run
-```
-
-On Windows PowerShell:
+Windows PowerShell:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
-The application starts on **port 8081**. Verify it's running:
-
-http://localhost:8081/actuator/health
-
-
-### 4. Run tests
+Linux or macOS:
 
 ```bash
-./mvnw test
+./mvnw spring-boot:run
 ```
 
-This runs unit tests (Mockito), controller tests (MockMvc), and integration tests (Testcontainers — requires Docker to be running).
+The application runs on port `8081`.
 
-## API Endpoints
+Open the health endpoint:
 
-### Departments
+[http://localhost:8081/actuator/health](http://localhost:8081/actuator/health)
 
-| Method | URL | Description | Success |
-|--------|-----|-------------|---------|
-| `POST` | `/api/v1/departments` | Create a department | `201 Created` |
-| `GET` | `/api/v1/departments/{id}` | Get department by ID | `200 OK` |
-| `GET` | `/api/v1/departments` | List all departments | `200 OK` |
-
-### Example: Create a department
-
-**Request:**
+A healthy application returns:
 
 ```json
-POST /api/v1/departments
+{
+  "status": "UP"
+}
+```
+
+## Running Tests
+
+Keep Docker running for the integration tests.
+
+Windows PowerShell:
+
+```powershell
+.\mvnw.cmd clean test
+```
+
+Linux or macOS:
+
+```bash
+./mvnw clean test
+```
+
+This runs the service, controller, and PostgreSQL integration tests.
+
+Integration tests start an isolated PostgreSQL container with a dynamically assigned host port. They do not require the development database started by `docker compose up -d`.
+
+### Run individual test classes
+
+Windows PowerShell:
+
+```powershell
+.\mvnw.cmd "-Dtest=DepartmentServiceTest" test
+.\mvnw.cmd "-Dtest=DepartmentControllerTest" test
+.\mvnw.cmd "-Dtest=DepartmentIntegrationTest" test
+```
+
+Linux or macOS:
+
+```bash
+./mvnw -Dtest=DepartmentServiceTest test
+./mvnw -Dtest=DepartmentControllerTest test
+./mvnw -Dtest=DepartmentIntegrationTest test
+```
+
+Service and controller tests do not require Docker.
+
+### Testing Strategy
+
+- **Service unit tests:** verify business rules, response mapping, and exception handling using a mocked repository.
+- **Controller tests:** verify HTTP status codes, the creation `Location` header, response bodies, and invalid request handling using MockMvc.
+- **Integration tests:** verify application startup, migrations, persistence, and duplicate handling against PostgreSQL through the Spring-managed service.
+
+The concurrency test coordinates two requests so both observe an unused code before attempting insertion. It checks that one succeeds, one produces a domain conflict, and only one row is stored.
+
+A duplicate-key warning in the database logs is expected during that test.
+
+## Continuous Integration
+
+The GitHub Actions workflow is configured to run the Maven test suite on:
+
+- Pull requests targeting `main`.
+- Pushes to `main`.
+
+CI uses Java 25 on an Ubuntu runner.
+
+Check the [Actions page](https://github.com/BoDe-117/university-management-system/actions) for the latest run results.
+
+## Department API
+
+Base URL: `http://localhost:8081`
+
+| Method | Endpoint | Description | Success |
+|--------|----------|-------------|---------|
+| `POST` | `/api/v1/departments` | Create a department | `201 Created` |
+| `GET` | `/api/v1/departments/{id}` | Retrieve a department | `200 OK` |
+| `GET` | `/api/v1/departments` | List departments | `200 OK` |
+
+### Request Validation
+
+| Field | Rules |
+|-------|-------|
+| `code` | Required, not blank, maximum 20 characters |
+| `name` | Required, not blank, maximum 150 characters |
+
+Department codes must be unique. The current implementation stores codes as supplied, without trimming or case normalization.
+
+### Create a Department
+
+```http
+POST /api/v1/departments HTTP/1.1
+Host: localhost:8081
 Content-Type: application/json
 
 {
@@ -91,7 +198,15 @@ Content-Type: application/json
 }
 ```
 
-**Response (201 Created):**
+Example response headers:
+
+```http
+HTTP/1.1 201 Created
+Location: /api/v1/departments/bef682f0-7009-4b6a-88b9-0b31dda41a9f
+Content-Type: application/json
+```
+
+Example response body:
 
 ```json
 {
@@ -103,9 +218,43 @@ Content-Type: application/json
 }
 ```
 
-### Error Responses
+IDs and timestamps are generated; actual values will differ.
 
-All errors return a consistent shape:
+### Retrieve a Department
+
+Use the ID returned by the creation endpoint:
+
+```http
+GET /api/v1/departments/bef682f0-7009-4b6a-88b9-0b31dda41a9f HTTP/1.1
+Host: localhost:8081
+```
+
+An existing department returns `200` with a department response object. A missing department returns `404`.
+
+### List Departments
+
+```http
+GET /api/v1/departments HTTP/1.1
+Host: localhost:8081
+```
+
+Returns `200` with a JSON array of department response objects. If no departments exist, the response is:
+
+```json
+[]
+```
+
+## Error Responses
+
+The explicitly handled Department errors share these fields:
+
+- `timestamp`
+- `status`
+- `error`
+
+Field-validation errors also include `fieldErrors`.
+
+Example validation response:
 
 ```json
 {
@@ -118,32 +267,70 @@ All errors return a consistent shape:
 }
 ```
 
-| Status | Meaning |
-|--------|---------|
-| `400` | Validation failure, malformed JSON, or invalid UUID |
-| `404` | Resource not found |
-| `409` | Duplicate code conflict |
+Example duplicate-code response:
+
+```json
+{
+  "timestamp": "2026-09-03T13:01:47.242Z",
+  "status": 409,
+  "error": "A department with code 'CS' already exists"
+}
+```
+
+| Status | Handled cases |
+|--------|---------------|
+| `400` | Field validation, malformed or missing request body, incompatible JSON values, invalid UUID |
+| `404` | Department not found |
+| `409` | Duplicate department code |
+
+Other framework errors and unexpected server failures are not currently covered by this custom error-format contract.
 
 ## Project Structure
 
-src/main/java/.../
-├── common/exception/ # Global exception handling
-├── department/
-│ ├── controller/ # REST endpoints
-│ ├── dto/ # Request/response objects
-│ ├── entity/ # JPA entity
-│ ├── exception/ # Domain-specific exceptions
-│ ├── repository/ # Data access
-│ └── service/ # Business logic
-└── UniversityManagementSystemApplication.java
+```text
+src/
+├── main/
+│   ├── java/com/abdulrahman/university_management_system/
+│   │   ├── common/exception/
+│   │   ├── department/
+│   │   │   ├── controller/
+│   │   │   ├── dto/
+│   │   │   ├── entity/
+│   │   │   ├── exception/
+│   │   │   ├── repository/
+│   │   │   └── service/
+│   │   └── UniversityManagementSystemApplication.java
+│   └── resources/
+│       ├── application.properties
+│       └── db/migration/
+│           └── V1__create_departments.sql
+└── test/
+    └── java/com/abdulrahman/university_management_system/
+        └── department/
+            ├── controller/
+            ├── integration/
+            └── service/
+```
 
+## Design Decisions
 
-## Testing Strategy
+- Controllers handle HTTP requests and responses.
+- Services contain business rules and transaction boundaries.
+- Repositories provide database access.
+- DTOs keep the API separate from JPA entities.
+- Flyway owns schema changes; Hibernate validates the schema.
+- The database unique constraint protects department codes against concurrent inserts.
+- `saveAndFlush()` makes the insert occur inside the service's exception-handling block.
+- Constraint inspection identifies duplicate-code failures without querying a failed transaction.
+- JPA generates application-created UUIDs and timestamps. Database defaults also support inserts that omit those values outside JPA.
 
-- **Unit tests** — Service logic with Mockito (mocked repository)
-- **Controller tests** — HTTP contract verification with MockMvc
-- **Integration tests** — Full stack against real PostgreSQL via Testcontainers, including concurrency race condition verification
+## Planned Features
 
-## License
+- Program management and its relationship to Departments.
+- Course management.
+- Enrollment.
+- Authentication and role-based authorization.
 
-This project is for educational and portfolio purposes.
+## Project Purpose
+
+This project is developed for learning and portfolio demonstration.

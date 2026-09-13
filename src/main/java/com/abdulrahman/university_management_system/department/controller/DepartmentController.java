@@ -4,7 +4,6 @@ import com.abdulrahman.university_management_system.department.dto.CreateDepartm
 import com.abdulrahman.university_management_system.department.dto.DepartmentResponse;
 import com.abdulrahman.university_management_system.department.service.DepartmentService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;

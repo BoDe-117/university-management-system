@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -32,7 +33,7 @@ class DepartmentControllerTest {
     @MockitoBean
     private DepartmentService departmentService;
 
-    // ── POST /api/v1/departments ────────────────────────────────────────
+    // POST /api/v1/departments
 
     @Test
     void createDepartment_returns201WithLocationHeader() throws Exception {
@@ -48,7 +49,8 @@ class DepartmentControllerTest {
                                 {"code": "CS", "name": "Computer Science"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(header().string("Location", "/api/v1/departments/" + id))
+                .andExpect(header().string(
+                        "Location", "/api/v1/departments/" + id))
                 .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.code").value("CS"))
                 .andExpect(jsonPath("$.name").value("Computer Science"))
@@ -108,13 +110,72 @@ class DepartmentControllerTest {
     }
 
     @Test
+    void createDepartment_returns400_whenCodeExceedsMaximumLength()
+            throws Exception {
+
+        String oversizedCode = "C".repeat(21);
+
+        mockMvc.perform(post("/api/v1/departments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code": "%s", "name": "Computer Science"}
+                                """.formatted(oversizedCode)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Validation failed"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.fieldErrors.code").exists());
+
+        verifyNoInteractions(departmentService);
+    }
+
+    @Test
+    void createDepartment_returns400_whenNameExceedsMaximumLength()
+            throws Exception {
+
+        String oversizedName = "N".repeat(151);
+
+        mockMvc.perform(post("/api/v1/departments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code": "CS", "name": "%s"}
+                                """.formatted(oversizedName)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Validation failed"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.fieldErrors.name").exists());
+
+        verifyNoInteractions(departmentService);
+    }
+
+    @Test
+    void createDepartment_returns400_whenCodeHasIncompatibleJsonType()
+            throws Exception {
+
+        mockMvc.perform(post("/api/v1/departments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"code": {}, "name": "Computer Science"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error")
+                        .value("Malformed or missing request body"))
+                .andExpect(jsonPath("$.timestamp").exists());
+
+        verifyNoInteractions(departmentService);
+    }
+
+    @Test
     void createDepartment_returns400_whenBodyIsMalformedJson() throws Exception {
         mockMvc.perform(post("/api/v1/departments")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{not valid json"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.error").value("Malformed or missing request body"))
+                .andExpect(jsonPath("$.error")
+                        .value("Malformed or missing request body"))
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
@@ -124,10 +185,11 @@ class DepartmentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.error").value("Malformed or missing request body"));
+                .andExpect(jsonPath("$.error")
+                        .value("Malformed or missing request body"));
     }
 
-    // ── GET /api/v1/departments/{id} ────────────────────────────────────
+    // GET /api/v1/departments/{id}
 
     @Test
     void getDepartmentById_returns200_whenDepartmentExists() throws Exception {
@@ -144,8 +206,11 @@ class DepartmentControllerTest {
     }
 
     @Test
-    void getDepartmentById_returns404_whenDepartmentDoesNotExist() throws Exception {
+    void getDepartmentById_returns404_whenDepartmentDoesNotExist()
+            throws Exception {
+
         UUID id = UUID.randomUUID();
+
         when(departmentService.getDepartmentById(id))
                 .thenThrow(new DepartmentNotFoundException(id));
 
@@ -165,14 +230,17 @@ class DepartmentControllerTest {
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
-    // ── GET /api/v1/departments ─────────────────────────────────────────
+    // GET /api/v1/departments
 
     @Test
     void getAllDepartments_returns200_withList() throws Exception {
         DepartmentResponse cs = new DepartmentResponse(
-                UUID.randomUUID(), "CS", "Computer Science", Instant.now(), Instant.now());
+                UUID.randomUUID(), "CS", "Computer Science",
+                Instant.now(), Instant.now());
+
         DepartmentResponse se = new DepartmentResponse(
-                UUID.randomUUID(), "SE", "Software Engineering", Instant.now(), Instant.now());
+                UUID.randomUUID(), "SE", "Software Engineering",
+                Instant.now(), Instant.now());
 
         when(departmentService.getAllDepartments()).thenReturn(List.of(cs, se));
 
