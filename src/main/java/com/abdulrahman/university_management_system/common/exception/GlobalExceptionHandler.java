@@ -1,6 +1,7 @@
 package com.abdulrahman.university_management_system.common.exception;
 
 import com.abdulrahman.university_management_system.department.exception.DepartmentCodeAlreadyExistsException;
+import com.abdulrahman.university_management_system.department.exception.DepartmentHasAssociatedProgramsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
 import com.abdulrahman.university_management_system.program.exception.ProgramCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
@@ -32,6 +33,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             DepartmentCodeAlreadyExistsException.class,
+            DepartmentHasAssociatedProgramsException.class,
             ProgramCodeAlreadyExistsException.class
     })
     public ResponseEntity<Map<String, Object>> handleConflict(

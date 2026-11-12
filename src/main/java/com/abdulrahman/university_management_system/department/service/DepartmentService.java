@@ -5,9 +5,13 @@ import com.abdulrahman.university_management_system.department.dto.DepartmentRes
 import com.abdulrahman.university_management_system.department.dto.UpdateDepartmentRequest;
 import com.abdulrahman.university_management_system.department.entity.Department;
 import com.abdulrahman.university_management_system.department.exception.DepartmentCodeAlreadyExistsException;
+import com.abdulrahman.university_management_system.department.exception.DepartmentHasAssociatedProgramsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
 import com.abdulrahman.university_management_system.department.repository.DepartmentRepository;
+import com.abdulrahman.university_management_system.program.repository.ProgramRepository;
 import org.hibernate.exception.ConstraintViolationException;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,10 +25,18 @@ public class DepartmentService {
     private static final String DEPARTMENT_CODE_UNIQUE_CONSTRAINT =
             "departments_code_key";
 
-    private final DepartmentRepository departmentRepository;
+    private static final String PROGRAM_DEPARTMENT_FOREIGN_KEY =
+            "fk_programs_department";
 
-    public DepartmentService(DepartmentRepository departmentRepository) {
+    private final DepartmentRepository departmentRepository;
+    private final ProgramRepository programRepository;
+
+    public DepartmentService(
+            DepartmentRepository departmentRepository,
+            ProgramRepository programRepository
+    ) {
         this.departmentRepository = departmentRepository;
+        this.programRepository = programRepository;
     }
 
     @Transactional
@@ -72,6 +84,30 @@ public class DepartmentService {
         }
     }
 
+    @Transactional
+    public void deleteDepartment(UUID id) {
+        Department department = departmentRepository.findById(id)
+                .orElseThrow(() -> new DepartmentNotFoundException(id));
+
+        if (programRepository.existsByDepartmentId(id)) {
+            throw new DepartmentHasAssociatedProgramsException(
+                    department.getCode()
+            );
+        }
+
+        try {
+            departmentRepository.delete(department);
+            departmentRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            if (isProgramDepartmentViolation(e)) {
+                throw new DepartmentHasAssociatedProgramsException(
+                        department.getCode()
+                );
+            }
+            throw e;
+        }
+    }
+
     @Transactional(readOnly = true)
     public DepartmentResponse getDepartmentById(UUID id) {
         Department department = departmentRepository.findById(id)
@@ -97,6 +133,37 @@ public class DepartmentService {
         return false;
     }
 
+    private boolean isProgramDepartmentViolation(
+            DataIntegrityViolationException exception
+    ) {
+        Throwable cause = exception;
+
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException cve
+                    && PROGRAM_DEPARTMENT_FOREIGN_KEY.equals(
+                    cve.getConstraintName()
+            )) {
+                return true;
+            }
+
+            if (cause instanceof PSQLException postgresException) {
+                ServerErrorMessage details =
+                        postgresException.getServerErrorMessage();
+
+                if (details != null
+                        && PROGRAM_DEPARTMENT_FOREIGN_KEY.equals(
+                        details.getConstraint()
+                )) {
+                    return true;
+                }
+            }
+
+            cause = cause.getCause();
+        }
+
+        return false;
+    }
+
     private DepartmentResponse toResponse(Department department) {
         return new DepartmentResponse(
                 department.getId(),
@@ -107,3 +174,4 @@ public class DepartmentService {
         );
     }
 }
+

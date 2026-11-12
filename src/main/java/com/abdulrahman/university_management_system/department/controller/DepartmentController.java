@@ -6,6 +6,7 @@ import com.abdulrahman.university_management_system.department.dto.UpdateDepartm
 import com.abdulrahman.university_management_system.department.service.DepartmentService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,6 +47,12 @@ public class DepartmentController {
                 departmentService.updateDepartment(id, request);
 
         return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteDepartment(@PathVariable UUID id) {
+        departmentService.deleteDepartment(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
