@@ -5,6 +5,7 @@ import com.abdulrahman.university_management_system.department.exception.Departm
 import com.abdulrahman.university_management_system.department.repository.DepartmentRepository;
 import com.abdulrahman.university_management_system.program.dto.CreateProgramRequest;
 import com.abdulrahman.university_management_system.program.dto.ProgramResponse;
+import com.abdulrahman.university_management_system.program.dto.UpdateProgramRequest;
 import com.abdulrahman.university_management_system.program.entity.Program;
 import com.abdulrahman.university_management_system.program.exception.ProgramCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
@@ -62,6 +63,48 @@ public class ProgramService {
 
             throw exception;
         }
+    }
+
+    @Transactional
+    public ProgramResponse updateProgram(
+            UUID id,
+            UpdateProgramRequest request
+    ) {
+        Program program = programRepository.findById(id)
+                .orElseThrow(() -> new ProgramNotFoundException(id));
+
+        if (programRepository.existsByCodeAndIdNot(request.code(), id)) {
+            throw new ProgramCodeAlreadyExistsException(request.code());
+        }
+
+        Department department = departmentRepository
+                .findById(request.departmentId())
+                .orElseThrow(() ->
+                        new DepartmentNotFoundException(request.departmentId())
+                );
+
+        program.setCode(request.code());
+        program.setName(request.name());
+        program.setDepartment(department);
+
+        try {
+            Program saved = programRepository.saveAndFlush(program);
+            return toResponse(saved);
+        } catch (DataIntegrityViolationException exception) {
+            if (isDuplicateCodeViolation(exception)) {
+                throw new ProgramCodeAlreadyExistsException(request.code());
+            }
+
+            throw exception;
+        }
+    }
+
+    @Transactional
+    public void deleteProgram(UUID id) {
+        Program program = programRepository.findById(id)
+                .orElseThrow(() -> new ProgramNotFoundException(id));
+
+        programRepository.delete(program);
     }
 
     @Transactional(readOnly = true)
