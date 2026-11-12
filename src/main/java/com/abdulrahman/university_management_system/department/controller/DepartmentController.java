@@ -2,12 +2,14 @@ package com.abdulrahman.university_management_system.department.controller;
 
 import com.abdulrahman.university_management_system.department.dto.CreateDepartmentRequest;
 import com.abdulrahman.university_management_system.department.dto.DepartmentResponse;
+import com.abdulrahman.university_management_system.department.dto.UpdateDepartmentRequest;
 import com.abdulrahman.university_management_system.department.service.DepartmentService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,8 +37,21 @@ public class DepartmentController {
         return ResponseEntity.created(location).body(created);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<DepartmentResponse> updateDepartment(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateDepartmentRequest request) {
+
+        DepartmentResponse updated =
+                departmentService.updateDepartment(id, request);
+
+        return ResponseEntity.ok(updated);
+    }
+
     @GetMapping("/{id}")
-    public ResponseEntity<DepartmentResponse> getDepartmentById(@PathVariable UUID id) {
+    public ResponseEntity<DepartmentResponse> getDepartmentById(
+            @PathVariable UUID id) {
+
         DepartmentResponse department = departmentService.getDepartmentById(id);
         return ResponseEntity.ok(department);
     }

@@ -2,6 +2,7 @@ package com.abdulrahman.university_management_system.department.service;
 
 import com.abdulrahman.university_management_system.department.dto.CreateDepartmentRequest;
 import com.abdulrahman.university_management_system.department.dto.DepartmentResponse;
+import com.abdulrahman.university_management_system.department.dto.UpdateDepartmentRequest;
 import com.abdulrahman.university_management_system.department.entity.Department;
 import com.abdulrahman.university_management_system.department.exception.DepartmentCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
@@ -17,7 +18,8 @@ import java.util.UUID;
 @Service
 public class DepartmentService {
 
-    private static final String DEPARTMENT_CODE_UNIQUE_CONSTRAINT = "departments_code_key";
+    private static final String DEPARTMENT_CODE_UNIQUE_CONSTRAINT =
+            "departments_code_key";
 
     private final DepartmentRepository departmentRepository;
 
@@ -44,10 +46,37 @@ public class DepartmentService {
         }
     }
 
+    @Transactional
+    public DepartmentResponse updateDepartment(
+            UUID id,
+            UpdateDepartmentRequest request
+    ) {
+        Department department = departmentRepository.findById(id)
+                .orElseThrow(() -> new DepartmentNotFoundException(id));
+
+        if (departmentRepository.existsByCodeAndIdNot(request.code(), id)) {
+            throw new DepartmentCodeAlreadyExistsException(request.code());
+        }
+
+        department.setCode(request.code());
+        department.setName(request.name());
+
+        try {
+            Department saved = departmentRepository.saveAndFlush(department);
+            return toResponse(saved);
+        } catch (DataIntegrityViolationException e) {
+            if (isDuplicateCodeViolation(e)) {
+                throw new DepartmentCodeAlreadyExistsException(request.code());
+            }
+            throw e;
+        }
+    }
+
     @Transactional(readOnly = true)
     public DepartmentResponse getDepartmentById(UUID id) {
         Department department = departmentRepository.findById(id)
                 .orElseThrow(() -> new DepartmentNotFoundException(id));
+
         return toResponse(department);
     }
 
@@ -61,7 +90,9 @@ public class DepartmentService {
 
     private boolean isDuplicateCodeViolation(DataIntegrityViolationException e) {
         if (e.getCause() instanceof ConstraintViolationException cve) {
-            return DEPARTMENT_CODE_UNIQUE_CONSTRAINT.equals(cve.getConstraintName());
+            return DEPARTMENT_CODE_UNIQUE_CONSTRAINT.equals(
+                    cve.getConstraintName()
+            );
         }
         return false;
     }
