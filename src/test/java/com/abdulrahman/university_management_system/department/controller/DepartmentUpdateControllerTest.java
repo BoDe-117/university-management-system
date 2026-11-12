@@ -136,6 +136,45 @@ class DepartmentUpdateControllerTest {
     }
 
     @Test
+    void updateDepartment_returns400_whenFieldsAreNull() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        mockMvc.perform(put("/api/v1/departments/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "code": null,
+                                  "name": null
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.code").exists())
+                .andExpect(jsonPath("$.fieldErrors.name").exists());
+    }
+
+    @Test
+    void updateDepartment_returns400_whenFieldsExceedMaximumLength()
+            throws Exception {
+        UUID id = UUID.randomUUID();
+        String longCode = "A".repeat(21);
+        String longName = "B".repeat(151);
+
+        mockMvc.perform(put("/api/v1/departments/{id}", id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "code": "%s",
+                                  "name": "%s"
+                                }
+                                """.formatted(longCode, longName)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.fieldErrors.code").exists())
+                .andExpect(jsonPath("$.fieldErrors.name").exists());
+    }
+
+    @Test
     void updateDepartment_returns400_whenIdIsInvalid() throws Exception {
         mockMvc.perform(put("/api/v1/departments/not-a-uuid")
                         .contentType(MediaType.APPLICATION_JSON)

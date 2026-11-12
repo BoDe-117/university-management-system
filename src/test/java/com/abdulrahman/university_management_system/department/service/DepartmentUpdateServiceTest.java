@@ -6,6 +6,7 @@ import com.abdulrahman.university_management_system.department.entity.Department
 import com.abdulrahman.university_management_system.department.exception.DepartmentCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
 import com.abdulrahman.university_management_system.department.repository.DepartmentRepository;
+import com.abdulrahman.university_management_system.program.repository.ProgramRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +32,9 @@ class DepartmentUpdateServiceTest {
     @Mock
     private DepartmentRepository departmentRepository;
 
+    @Mock
+    private ProgramRepository programRepository;
+
     @InjectMocks
     private DepartmentService departmentService;
 
@@ -48,7 +52,8 @@ class DepartmentUpdateServiceTest {
         when(departmentRepository.saveAndFlush(department))
                 .thenReturn(department);
 
-        DepartmentResponse response = departmentService.updateDepartment(id, request);
+        DepartmentResponse response =
+                departmentService.updateDepartment(id, request);
 
         assertThat(response.code()).isEqualTo("SE");
         assertThat(response.name()).isEqualTo("Software Engineering");
@@ -69,7 +74,8 @@ class DepartmentUpdateServiceTest {
         when(departmentRepository.saveAndFlush(department))
                 .thenReturn(department);
 
-        DepartmentResponse response = departmentService.updateDepartment(id, request);
+        DepartmentResponse response =
+                departmentService.updateDepartment(id, request);
 
         assertThat(response.code()).isEqualTo("CS");
         assertThat(response.name()).isEqualTo("New Name");
@@ -82,12 +88,14 @@ class DepartmentUpdateServiceTest {
         UpdateDepartmentRequest request =
                 new UpdateDepartmentRequest("CS", "Computer Science");
 
-        when(departmentRepository.findById(id)).thenReturn(Optional.empty());
+        when(departmentRepository.findById(id))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> departmentService.updateDepartment(id, request))
                 .isInstanceOf(DepartmentNotFoundException.class);
 
-        verify(departmentRepository, never()).saveAndFlush(any(Department.class));
+        verify(departmentRepository, never())
+                .saveAndFlush(any(Department.class));
     }
 
     @Test
@@ -106,7 +114,8 @@ class DepartmentUpdateServiceTest {
                 .isInstanceOf(DepartmentCodeAlreadyExistsException.class)
                 .hasMessageContaining("SE");
 
-        verify(departmentRepository, never()).saveAndFlush(any(Department.class));
+        verify(departmentRepository, never())
+                .saveAndFlush(any(Department.class));
     }
 
     @Test
