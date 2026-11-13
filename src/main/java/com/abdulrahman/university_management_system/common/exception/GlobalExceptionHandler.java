@@ -5,6 +5,8 @@ import com.abdulrahman.university_management_system.course.exception.CourseNotFo
 import com.abdulrahman.university_management_system.department.exception.DepartmentCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentHasAssociatedProgramsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
+import com.abdulrahman.university_management_system.enrollment.exception.EnrollmentAlreadyExistsException;
+import com.abdulrahman.university_management_system.enrollment.exception.EnrollmentNotFoundException;
 import com.abdulrahman.university_management_system.program.exception.ProgramCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedCoursesException;
 import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedStudentsException;
@@ -32,7 +34,8 @@ public class GlobalExceptionHandler {
             DepartmentNotFoundException.class,
             ProgramNotFoundException.class,
             CourseNotFoundException.class,
-            StudentNotFoundException.class
+            StudentNotFoundException.class,
+            EnrollmentNotFoundException.class
     })
     public ResponseEntity<Map<String, Object>> handleNotFound(
             RuntimeException exception
@@ -48,7 +51,8 @@ public class GlobalExceptionHandler {
             ProgramHasAssociatedStudentsException.class,
             CourseCodeAlreadyExistsException.class,
             StudentIdAlreadyExistsException.class,
-            StudentEmailAlreadyExistsException.class
+            StudentEmailAlreadyExistsException.class,
+            EnrollmentAlreadyExistsException.class
     })
     public ResponseEntity<Map<String, Object>> handleConflict(
             RuntimeException exception
