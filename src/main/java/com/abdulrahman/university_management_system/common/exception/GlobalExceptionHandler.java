@@ -7,7 +7,11 @@ import com.abdulrahman.university_management_system.department.exception.Departm
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
 import com.abdulrahman.university_management_system.program.exception.ProgramCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedCoursesException;
+import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedStudentsException;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
+import com.abdulrahman.university_management_system.student.exception.StudentEmailAlreadyExistsException;
+import com.abdulrahman.university_management_system.student.exception.StudentIdAlreadyExistsException;
+import com.abdulrahman.university_management_system.student.exception.StudentNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -27,7 +31,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             DepartmentNotFoundException.class,
             ProgramNotFoundException.class,
-            CourseNotFoundException.class
+            CourseNotFoundException.class,
+            StudentNotFoundException.class
     })
     public ResponseEntity<Map<String, Object>> handleNotFound(
             RuntimeException exception
@@ -40,7 +45,10 @@ public class GlobalExceptionHandler {
             DepartmentHasAssociatedProgramsException.class,
             ProgramCodeAlreadyExistsException.class,
             ProgramHasAssociatedCoursesException.class,
-            CourseCodeAlreadyExistsException.class
+            ProgramHasAssociatedStudentsException.class,
+            CourseCodeAlreadyExistsException.class,
+            StudentIdAlreadyExistsException.class,
+            StudentEmailAlreadyExistsException.class
     })
     public ResponseEntity<Map<String, Object>> handleConflict(
             RuntimeException exception

@@ -10,8 +10,10 @@ import com.abdulrahman.university_management_system.program.dto.UpdateProgramReq
 import com.abdulrahman.university_management_system.program.entity.Program;
 import com.abdulrahman.university_management_system.program.exception.ProgramCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedCoursesException;
+import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedStudentsException;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
 import com.abdulrahman.university_management_system.program.repository.ProgramRepository;
+import com.abdulrahman.university_management_system.student.repository.StudentRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
@@ -31,18 +33,24 @@ public class ProgramService {
     private static final String COURSE_PROGRAM_FOREIGN_KEY =
             "fk_courses_program";
 
+    private static final String STUDENT_PROGRAM_FOREIGN_KEY =
+            "fk_students_program";
+
     private final ProgramRepository programRepository;
     private final DepartmentRepository departmentRepository;
     private final CourseRepository courseRepository;
+    private final StudentRepository studentRepository;
 
     public ProgramService(
             ProgramRepository programRepository,
             DepartmentRepository departmentRepository,
-            CourseRepository courseRepository
+            CourseRepository courseRepository,
+            StudentRepository studentRepository
     ) {
         this.programRepository = programRepository;
         this.departmentRepository = departmentRepository;
         this.courseRepository = courseRepository;
+        this.studentRepository = studentRepository;
     }
 
     @Transactional
@@ -118,12 +126,20 @@ public class ProgramService {
             throw new ProgramHasAssociatedCoursesException(program.getCode());
         }
 
+        if (studentRepository.existsByProgramId(id)) {
+            throw new ProgramHasAssociatedStudentsException(program.getCode());
+        }
+
         try {
             programRepository.delete(program);
             programRepository.flush();
         } catch (DataIntegrityViolationException exception) {
-            if (isCourseProgramViolation(exception)) {
+            if (hasConstraint(exception, COURSE_PROGRAM_FOREIGN_KEY)) {
                 throw new ProgramHasAssociatedCoursesException(program.getCode());
+            }
+
+            if (hasConstraint(exception, STUDENT_PROGRAM_FOREIGN_KEY)) {
+                throw new ProgramHasAssociatedStudentsException(program.getCode());
             }
 
             throw exception;
@@ -172,16 +188,15 @@ public class ProgramService {
         return false;
     }
 
-    private boolean isCourseProgramViolation(
-            DataIntegrityViolationException exception
+    private boolean hasConstraint(
+            DataIntegrityViolationException exception,
+            String constraintName
     ) {
         Throwable cause = exception;
 
         while (cause != null) {
             if (cause instanceof ConstraintViolationException constraintViolation
-                    && COURSE_PROGRAM_FOREIGN_KEY.equals(
-                    constraintViolation.getConstraintName()
-            )) {
+                    && constraintName.equals(constraintViolation.getConstraintName())) {
                 return true;
             }
 
@@ -190,9 +205,7 @@ public class ProgramService {
                         postgresException.getServerErrorMessage();
 
                 if (details != null
-                        && COURSE_PROGRAM_FOREIGN_KEY.equals(
-                        details.getConstraint()
-                )) {
+                        && constraintName.equals(details.getConstraint())) {
                     return true;
                 }
             }
