@@ -1,9 +1,12 @@
 package com.abdulrahman.university_management_system.common.exception;
 
+import com.abdulrahman.university_management_system.course.exception.CourseCodeAlreadyExistsException;
+import com.abdulrahman.university_management_system.course.exception.CourseNotFoundException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentHasAssociatedProgramsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
 import com.abdulrahman.university_management_system.program.exception.ProgramCodeAlreadyExistsException;
+import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedCoursesException;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +26,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             DepartmentNotFoundException.class,
-            ProgramNotFoundException.class
+            ProgramNotFoundException.class,
+            CourseNotFoundException.class
     })
     public ResponseEntity<Map<String, Object>> handleNotFound(
             RuntimeException exception
@@ -34,7 +38,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             DepartmentCodeAlreadyExistsException.class,
             DepartmentHasAssociatedProgramsException.class,
-            ProgramCodeAlreadyExistsException.class
+            ProgramCodeAlreadyExistsException.class,
+            ProgramHasAssociatedCoursesException.class,
+            CourseCodeAlreadyExistsException.class
     })
     public ResponseEntity<Map<String, Object>> handleConflict(
             RuntimeException exception
