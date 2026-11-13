@@ -1,5 +1,6 @@
 package com.abdulrahman.university_management_system.program.service;
 
+import com.abdulrahman.university_management_system.course.repository.CourseRepository;
 import com.abdulrahman.university_management_system.department.entity.Department;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
 import com.abdulrahman.university_management_system.department.repository.DepartmentRepository;
@@ -8,9 +9,12 @@ import com.abdulrahman.university_management_system.program.dto.ProgramResponse;
 import com.abdulrahman.university_management_system.program.dto.UpdateProgramRequest;
 import com.abdulrahman.university_management_system.program.entity.Program;
 import com.abdulrahman.university_management_system.program.exception.ProgramCodeAlreadyExistsException;
+import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedCoursesException;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
 import com.abdulrahman.university_management_system.program.repository.ProgramRepository;
 import org.hibernate.exception.ConstraintViolationException;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,15 +28,21 @@ public class ProgramService {
     private static final String PROGRAM_CODE_UNIQUE_CONSTRAINT =
             "uk_programs_code";
 
+    private static final String COURSE_PROGRAM_FOREIGN_KEY =
+            "fk_courses_program";
+
     private final ProgramRepository programRepository;
     private final DepartmentRepository departmentRepository;
+    private final CourseRepository courseRepository;
 
     public ProgramService(
             ProgramRepository programRepository,
-            DepartmentRepository departmentRepository
+            DepartmentRepository departmentRepository,
+            CourseRepository courseRepository
     ) {
         this.programRepository = programRepository;
         this.departmentRepository = departmentRepository;
+        this.courseRepository = courseRepository;
     }
 
     @Transactional
@@ -104,7 +114,20 @@ public class ProgramService {
         Program program = programRepository.findById(id)
                 .orElseThrow(() -> new ProgramNotFoundException(id));
 
-        programRepository.delete(program);
+        if (courseRepository.existsByProgramId(id)) {
+            throw new ProgramHasAssociatedCoursesException(program.getCode());
+        }
+
+        try {
+            programRepository.delete(program);
+            programRepository.flush();
+        } catch (DataIntegrityViolationException exception) {
+            if (isCourseProgramViolation(exception)) {
+                throw new ProgramHasAssociatedCoursesException(program.getCode());
+            }
+
+            throw exception;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -144,6 +167,37 @@ public class ProgramService {
             return PROGRAM_CODE_UNIQUE_CONSTRAINT.equals(
                     constraintViolation.getConstraintName()
             );
+        }
+
+        return false;
+    }
+
+    private boolean isCourseProgramViolation(
+            DataIntegrityViolationException exception
+    ) {
+        Throwable cause = exception;
+
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException constraintViolation
+                    && COURSE_PROGRAM_FOREIGN_KEY.equals(
+                    constraintViolation.getConstraintName()
+            )) {
+                return true;
+            }
+
+            if (cause instanceof PSQLException postgresException) {
+                ServerErrorMessage details =
+                        postgresException.getServerErrorMessage();
+
+                if (details != null
+                        && COURSE_PROGRAM_FOREIGN_KEY.equals(
+                        details.getConstraint()
+                )) {
+                    return true;
+                }
+            }
+
+            cause = cause.getCause();
         }
 
         return false;
