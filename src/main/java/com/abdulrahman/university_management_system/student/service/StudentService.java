@@ -5,6 +5,7 @@ import com.abdulrahman.university_management_system.program.exception.ProgramNot
 import com.abdulrahman.university_management_system.program.repository.ProgramRepository;
 import com.abdulrahman.university_management_system.student.dto.CreateStudentRequest;
 import com.abdulrahman.university_management_system.student.dto.StudentResponse;
+import com.abdulrahman.university_management_system.student.dto.UpdateStudentRequest;
 import com.abdulrahman.university_management_system.student.entity.Student;
 import com.abdulrahman.university_management_system.student.exception.StudentEmailAlreadyExistsException;
 import com.abdulrahman.university_management_system.student.exception.StudentIdAlreadyExistsException;
@@ -77,6 +78,56 @@ public class StudentService {
 
             throw exception;
         }
+    }
+
+    @Transactional
+    public StudentResponse updateStudent(UUID id, UpdateStudentRequest request) {
+        Student student = studentRepository.findById(id)
+                .orElseThrow(() -> new StudentNotFoundException(id));
+
+        if (studentRepository.existsByStudentIdAndIdNot(request.studentId(), id)) {
+            throw new StudentIdAlreadyExistsException(request.studentId());
+        }
+
+        if (studentRepository.existsByEmailAndIdNot(request.email(), id)) {
+            throw new StudentEmailAlreadyExistsException(request.email());
+        }
+
+        Program program = programRepository.findById(request.programId())
+                .orElseThrow(() ->
+                        new ProgramNotFoundException(request.programId())
+                );
+
+        student.setStudentId(request.studentId());
+        student.setFirstName(request.firstName());
+        student.setLastName(request.lastName());
+        student.setEmail(request.email());
+        student.setProgram(program);
+
+        try {
+            Student saved = studentRepository.saveAndFlush(student);
+            return toResponse(saved);
+        } catch (DataIntegrityViolationException exception) {
+            String constraintName = getConstraintName(exception);
+
+            if (STUDENT_ID_CONSTRAINT.equals(constraintName)) {
+                throw new StudentIdAlreadyExistsException(request.studentId());
+            }
+
+            if (STUDENT_EMAIL_CONSTRAINT.equals(constraintName)) {
+                throw new StudentEmailAlreadyExistsException(request.email());
+            }
+
+            throw exception;
+        }
+    }
+
+    @Transactional
+    public void deleteStudent(UUID id) {
+        Student student = studentRepository.findById(id)
+                .orElseThrow(() -> new StudentNotFoundException(id));
+
+        studentRepository.delete(student);
     }
 
     @Transactional(readOnly = true)

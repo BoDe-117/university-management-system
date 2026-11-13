@@ -2,12 +2,15 @@ package com.abdulrahman.university_management_system.student.controller;
 
 import com.abdulrahman.university_management_system.student.dto.CreateStudentRequest;
 import com.abdulrahman.university_management_system.student.dto.StudentResponse;
+import com.abdulrahman.university_management_system.student.dto.UpdateStudentRequest;
 import com.abdulrahman.university_management_system.student.service.StudentService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,6 +38,22 @@ public class StudentController {
         URI location = URI.create("/api/v1/students/" + created.id());
 
         return ResponseEntity.created(location).body(created);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<StudentResponse> updateStudent(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateStudentRequest request
+    ) {
+        StudentResponse updated = studentService.updateStudent(id, request);
+
+        return ResponseEntity.ok(updated);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteStudent(@PathVariable UUID id) {
+        studentService.deleteStudent(id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
