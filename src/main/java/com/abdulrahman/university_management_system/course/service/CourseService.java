@@ -2,6 +2,7 @@ package com.abdulrahman.university_management_system.course.service;
 
 import com.abdulrahman.university_management_system.course.dto.CourseResponse;
 import com.abdulrahman.university_management_system.course.dto.CreateCourseRequest;
+import com.abdulrahman.university_management_system.course.dto.UpdateCourseRequest;
 import com.abdulrahman.university_management_system.course.entity.Course;
 import com.abdulrahman.university_management_system.course.exception.CourseCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.course.exception.CourseNotFoundException;
@@ -62,6 +63,45 @@ public class CourseService {
 
             throw exception;
         }
+    }
+
+    @Transactional
+    public CourseResponse updateCourse(UUID id, UpdateCourseRequest request) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new CourseNotFoundException(id));
+
+        if (courseRepository.existsByCodeAndIdNot(request.code(), id)) {
+            throw new CourseCodeAlreadyExistsException(request.code());
+        }
+
+        Program program = programRepository.findById(request.programId())
+                .orElseThrow(() ->
+                        new ProgramNotFoundException(request.programId())
+                );
+
+        course.setCode(request.code());
+        course.setName(request.name());
+        course.setCredits(request.credits());
+        course.setProgram(program);
+
+        try {
+            Course saved = courseRepository.saveAndFlush(course);
+            return toResponse(saved);
+        } catch (DataIntegrityViolationException exception) {
+            if (isDuplicateCodeViolation(exception)) {
+                throw new CourseCodeAlreadyExistsException(request.code());
+            }
+
+            throw exception;
+        }
+    }
+
+    @Transactional
+    public void deleteCourse(UUID id) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new CourseNotFoundException(id));
+
+        courseRepository.delete(course);
     }
 
     @Transactional(readOnly = true)
