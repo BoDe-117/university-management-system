@@ -18,6 +18,10 @@ import com.abdulrahman.university_management_system.student.exception.StudentHas
 import com.abdulrahman.university_management_system.student.exception.StudentHasUserAccountException;
 import com.abdulrahman.university_management_system.student.exception.StudentIdAlreadyExistsException;
 import com.abdulrahman.university_management_system.student.exception.StudentNotFoundException;
+import com.abdulrahman.university_management_system.user.exception.InvalidPasswordException;
+import com.abdulrahman.university_management_system.user.exception.InvalidUserStudentAssociationException;
+import com.abdulrahman.university_management_system.user.exception.StudentAlreadyHasAccountException;
+import com.abdulrahman.university_management_system.user.exception.UsernameAlreadyExistsException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -60,12 +64,24 @@ public class GlobalExceptionHandler {
             StudentHasAssociatedEnrollmentsException.class,
             StudentHasUserAccountException.class,
             EnrollmentAlreadyExistsException.class,
-            InvalidEnrollmentStatusTransitionException.class
+            InvalidEnrollmentStatusTransitionException.class,
+            UsernameAlreadyExistsException.class,
+            StudentAlreadyHasAccountException.class
     })
     public ResponseEntity<Map<String, Object>> handleConflict(
             RuntimeException exception
     ) {
         return buildResponse(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler({
+            InvalidPasswordException.class,
+            InvalidUserStudentAssociationException.class
+    })
+    public ResponseEntity<Map<String, Object>> handleInvalidUserRequest(
+            RuntimeException exception
+    ) {
+        return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
