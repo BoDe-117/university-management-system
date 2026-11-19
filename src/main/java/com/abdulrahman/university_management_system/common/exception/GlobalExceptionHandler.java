@@ -15,6 +15,7 @@ import com.abdulrahman.university_management_system.program.exception.ProgramHas
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
 import com.abdulrahman.university_management_system.student.exception.StudentEmailAlreadyExistsException;
 import com.abdulrahman.university_management_system.student.exception.StudentHasAssociatedEnrollmentsException;
+import com.abdulrahman.university_management_system.student.exception.StudentHasUserAccountException;
 import com.abdulrahman.university_management_system.student.exception.StudentIdAlreadyExistsException;
 import com.abdulrahman.university_management_system.student.exception.StudentNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -57,6 +58,7 @@ public class GlobalExceptionHandler {
             StudentIdAlreadyExistsException.class,
             StudentEmailAlreadyExistsException.class,
             StudentHasAssociatedEnrollmentsException.class,
+            StudentHasUserAccountException.class,
             EnrollmentAlreadyExistsException.class,
             InvalidEnrollmentStatusTransitionException.class
     })

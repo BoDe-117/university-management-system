@@ -10,9 +10,11 @@ import com.abdulrahman.university_management_system.student.dto.UpdateStudentReq
 import com.abdulrahman.university_management_system.student.entity.Student;
 import com.abdulrahman.university_management_system.student.exception.StudentEmailAlreadyExistsException;
 import com.abdulrahman.university_management_system.student.exception.StudentHasAssociatedEnrollmentsException;
+import com.abdulrahman.university_management_system.student.exception.StudentHasUserAccountException;
 import com.abdulrahman.university_management_system.student.exception.StudentIdAlreadyExistsException;
 import com.abdulrahman.university_management_system.student.exception.StudentNotFoundException;
 import com.abdulrahman.university_management_system.student.repository.StudentRepository;
+import com.abdulrahman.university_management_system.user.repository.UserRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
@@ -35,18 +37,24 @@ public class StudentService {
     private static final String ENROLLMENT_STUDENT_CONSTRAINT =
             "fk_enrollments_student";
 
+    private static final String USER_STUDENT_CONSTRAINT =
+            "fk_users_student";
+
     private final StudentRepository studentRepository;
     private final ProgramRepository programRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final UserRepository userRepository;
 
     public StudentService(
             StudentRepository studentRepository,
             ProgramRepository programRepository,
-            EnrollmentRepository enrollmentRepository
+            EnrollmentRepository enrollmentRepository,
+            UserRepository userRepository
     ) {
         this.studentRepository = studentRepository;
         this.programRepository = programRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -141,12 +149,20 @@ public class StudentService {
             throw new StudentHasAssociatedEnrollmentsException(id);
         }
 
+        if (userRepository.existsByStudentId(id)) {
+            throw new StudentHasUserAccountException(id);
+        }
+
         try {
             studentRepository.delete(student);
             studentRepository.flush();
         } catch (DataIntegrityViolationException exception) {
-            if (hasEnrollmentStudentConstraint(exception)) {
+            if (hasConstraint(exception, ENROLLMENT_STUDENT_CONSTRAINT)) {
                 throw new StudentHasAssociatedEnrollmentsException(id);
+            }
+
+            if (hasConstraint(exception, USER_STUDENT_CONSTRAINT)) {
+                throw new StudentHasUserAccountException(id);
             }
 
             throw exception;
@@ -190,26 +206,22 @@ public class StudentService {
         return null;
     }
 
-    private boolean hasEnrollmentStudentConstraint(
-            DataIntegrityViolationException exception
+    private boolean hasConstraint(
+            DataIntegrityViolationException exception,
+            String constraintName
     ) {
         Throwable cause = exception;
 
         while (cause != null) {
             if (cause instanceof ConstraintViolationException constraintViolation
-                    && ENROLLMENT_STUDENT_CONSTRAINT.equals(
-                    constraintViolation.getConstraintName()
-            )) {
+                    && constraintName.equals(constraintViolation.getConstraintName())) {
                 return true;
             }
 
             if (cause instanceof PSQLException postgresException) {
                 ServerErrorMessage details = postgresException.getServerErrorMessage();
 
-                if (details != null
-                        && ENROLLMENT_STUDENT_CONSTRAINT.equals(
-                        details.getConstraint()
-                )) {
+                if (details != null && constraintName.equals(details.getConstraint())) {
                     return true;
                 }
             }

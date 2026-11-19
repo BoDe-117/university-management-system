@@ -11,6 +11,7 @@ import com.abdulrahman.university_management_system.student.exception.StudentEma
 import com.abdulrahman.university_management_system.student.exception.StudentIdAlreadyExistsException;
 import com.abdulrahman.university_management_system.student.exception.StudentNotFoundException;
 import com.abdulrahman.university_management_system.student.repository.StudentRepository;
+import com.abdulrahman.university_management_system.user.repository.UserRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,9 @@ class StudentUpdateDeleteServiceTest {
 
     @Mock
     private EnrollmentRepository enrollmentRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private StudentService studentService;
