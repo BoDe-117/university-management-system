@@ -6,8 +6,10 @@ import com.abdulrahman.university_management_system.course.repository.CourseRepo
 import com.abdulrahman.university_management_system.enrollment.dto.CreateEnrollmentRequest;
 import com.abdulrahman.university_management_system.enrollment.dto.EnrollmentResponse;
 import com.abdulrahman.university_management_system.enrollment.entity.Enrollment;
+import com.abdulrahman.university_management_system.enrollment.entity.EnrollmentStatus;
 import com.abdulrahman.university_management_system.enrollment.exception.EnrollmentAlreadyExistsException;
 import com.abdulrahman.university_management_system.enrollment.exception.EnrollmentNotFoundException;
+import com.abdulrahman.university_management_system.enrollment.exception.InvalidEnrollmentStatusTransitionException;
 import com.abdulrahman.university_management_system.enrollment.repository.EnrollmentRepository;
 import com.abdulrahman.university_management_system.student.entity.Student;
 import com.abdulrahman.university_management_system.student.exception.StudentNotFoundException;
@@ -78,6 +80,30 @@ public class EnrollmentService {
     public EnrollmentResponse getEnrollmentById(UUID id) {
         Enrollment enrollment = enrollmentRepository.findById(id)
                 .orElseThrow(() -> new EnrollmentNotFoundException(id));
+
+        return toResponse(enrollment);
+    }
+
+    @Transactional
+    public EnrollmentResponse dropEnrollment(UUID id) {
+        return changeStatus(id, EnrollmentStatus.DROPPED);
+    }
+
+    @Transactional
+    public EnrollmentResponse completeEnrollment(UUID id) {
+        return changeStatus(id, EnrollmentStatus.COMPLETED);
+    }
+
+    private EnrollmentResponse changeStatus(UUID id, EnrollmentStatus newStatus) {
+        Enrollment enrollment = enrollmentRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new EnrollmentNotFoundException(id));
+
+        if (enrollment.getStatus() != EnrollmentStatus.ENROLLED) {
+            throw new InvalidEnrollmentStatusTransitionException(id);
+        }
+
+        enrollment.setStatus(newStatus);
+        enrollmentRepository.flush();
 
         return toResponse(enrollment);
     }

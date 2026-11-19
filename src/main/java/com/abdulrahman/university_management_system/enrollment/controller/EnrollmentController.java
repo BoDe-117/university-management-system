@@ -43,4 +43,20 @@ public class EnrollmentController {
         EnrollmentResponse response = enrollmentService.getEnrollmentById(id);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/{id}/drop")
+    public ResponseEntity<EnrollmentResponse> dropEnrollment(
+            @PathVariable UUID id
+    ) {
+        EnrollmentResponse response = enrollmentService.dropEnrollment(id);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<EnrollmentResponse> completeEnrollment(
+            @PathVariable UUID id
+    ) {
+        EnrollmentResponse response = enrollmentService.completeEnrollment(id);
+        return ResponseEntity.ok(response);
+    }
 }

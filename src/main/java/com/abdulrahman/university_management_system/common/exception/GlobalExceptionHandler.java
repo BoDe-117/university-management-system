@@ -7,6 +7,7 @@ import com.abdulrahman.university_management_system.department.exception.Departm
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
 import com.abdulrahman.university_management_system.enrollment.exception.EnrollmentAlreadyExistsException;
 import com.abdulrahman.university_management_system.enrollment.exception.EnrollmentNotFoundException;
+import com.abdulrahman.university_management_system.enrollment.exception.InvalidEnrollmentStatusTransitionException;
 import com.abdulrahman.university_management_system.program.exception.ProgramCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedCoursesException;
 import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedStudentsException;
@@ -52,7 +53,8 @@ public class GlobalExceptionHandler {
             CourseCodeAlreadyExistsException.class,
             StudentIdAlreadyExistsException.class,
             StudentEmailAlreadyExistsException.class,
-            EnrollmentAlreadyExistsException.class
+            EnrollmentAlreadyExistsException.class,
+            InvalidEnrollmentStatusTransitionException.class
     })
     public ResponseEntity<Map<String, Object>> handleConflict(
             RuntimeException exception
