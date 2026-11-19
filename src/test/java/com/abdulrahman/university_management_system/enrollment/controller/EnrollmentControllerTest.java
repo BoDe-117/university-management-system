@@ -19,6 +19,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -54,6 +55,10 @@ class EnrollmentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequest(studentId, courseId)))
                 .andExpect(status().isCreated())
+                .andExpect(header().string(
+                        "Location",
+                        "/api/v1/enrollments/" + id
+                ))
                 .andExpect(jsonPath("$.id").value(id.toString()))
                 .andExpect(jsonPath("$.studentId").value(studentId.toString()))
                 .andExpect(jsonPath("$.courseId").value(courseId.toString()))
@@ -90,6 +95,22 @@ class EnrollmentControllerTest {
                         .content(request))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.studentId").exists());
+    }
+
+    @Test
+    void createEnrollment_returns400_whenCourseIdIsMissing()
+            throws Exception {
+        String request = """
+                {
+                    "studentId": "%s"
+                }
+                """.formatted(UUID.randomUUID());
+
+        mockMvc.perform(post("/api/v1/enrollments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors.courseId").exists());
     }
 
     @Test

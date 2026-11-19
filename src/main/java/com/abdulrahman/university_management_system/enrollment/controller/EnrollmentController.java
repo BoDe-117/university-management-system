@@ -4,7 +4,6 @@ import com.abdulrahman.university_management_system.enrollment.dto.CreateEnrollm
 import com.abdulrahman.university_management_system.enrollment.dto.EnrollmentResponse;
 import com.abdulrahman.university_management_system.enrollment.service.EnrollmentService;
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
 import java.util.UUID;
 
 @RestController
@@ -30,7 +30,10 @@ public class EnrollmentController {
             @Valid @RequestBody CreateEnrollmentRequest request
     ) {
         EnrollmentResponse response = enrollmentService.createEnrollment(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+        URI location = URI.create("/api/v1/enrollments/" + response.id());
+
+        return ResponseEntity.created(location).body(response);
     }
 
     @GetMapping("/{id}")

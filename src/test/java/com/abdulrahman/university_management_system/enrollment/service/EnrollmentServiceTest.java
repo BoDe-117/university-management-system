@@ -13,12 +13,15 @@ import com.abdulrahman.university_management_system.enrollment.repository.Enroll
 import com.abdulrahman.university_management_system.student.entity.Student;
 import com.abdulrahman.university_management_system.student.exception.StudentNotFoundException;
 import com.abdulrahman.university_management_system.student.repository.StudentRepository;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -133,6 +136,54 @@ class EnrollmentServiceTest {
         )).isInstanceOf(EnrollmentAlreadyExistsException.class);
 
         verify(enrollmentRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createEnrollment_translatesDuplicateConstraintViolation() {
+        UUID studentId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+
+        when(studentRepository.findById(studentId))
+                .thenReturn(Optional.of(mock(Student.class)));
+        when(courseRepository.findById(courseId))
+                .thenReturn(Optional.of(mock(Course.class)));
+
+        ConstraintViolationException cause = new ConstraintViolationException(
+                "unique constraint violation",
+                new SQLException(),
+                "uk_enrollments_student_course"
+        );
+
+        DataIntegrityViolationException databaseError =
+                new DataIntegrityViolationException("duplicate enrollment", cause);
+
+        when(enrollmentRepository.saveAndFlush(any(Enrollment.class)))
+                .thenThrow(databaseError);
+
+        assertThatThrownBy(() -> enrollmentService.createEnrollment(
+                new CreateEnrollmentRequest(studentId, courseId)
+        )).isInstanceOf(EnrollmentAlreadyExistsException.class);
+    }
+
+    @Test
+    void createEnrollment_rethrowsUnrelatedDatabaseError() {
+        UUID studentId = UUID.randomUUID();
+        UUID courseId = UUID.randomUUID();
+
+        when(studentRepository.findById(studentId))
+                .thenReturn(Optional.of(mock(Student.class)));
+        when(courseRepository.findById(courseId))
+                .thenReturn(Optional.of(mock(Course.class)));
+
+        DataIntegrityViolationException databaseError =
+                new DataIntegrityViolationException("unrelated database error");
+
+        when(enrollmentRepository.saveAndFlush(any(Enrollment.class)))
+                .thenThrow(databaseError);
+
+        assertThatThrownBy(() -> enrollmentService.createEnrollment(
+                new CreateEnrollmentRequest(studentId, courseId)
+        )).isSameAs(databaseError);
     }
 
     @Test
