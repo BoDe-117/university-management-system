@@ -1,15 +1,20 @@
 package com.abdulrahman.university_management_system.common.exception;
 
 import com.abdulrahman.university_management_system.course.exception.CourseCodeAlreadyExistsException;
+import com.abdulrahman.university_management_system.course.exception.CourseHasAssociatedEnrollmentsException;
 import com.abdulrahman.university_management_system.course.exception.CourseNotFoundException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentHasAssociatedProgramsException;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
+import com.abdulrahman.university_management_system.enrollment.exception.EnrollmentAlreadyExistsException;
+import com.abdulrahman.university_management_system.enrollment.exception.EnrollmentNotFoundException;
+import com.abdulrahman.university_management_system.enrollment.exception.InvalidEnrollmentStatusTransitionException;
 import com.abdulrahman.university_management_system.program.exception.ProgramCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedCoursesException;
 import com.abdulrahman.university_management_system.program.exception.ProgramHasAssociatedStudentsException;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
 import com.abdulrahman.university_management_system.student.exception.StudentEmailAlreadyExistsException;
+import com.abdulrahman.university_management_system.student.exception.StudentHasAssociatedEnrollmentsException;
 import com.abdulrahman.university_management_system.student.exception.StudentIdAlreadyExistsException;
 import com.abdulrahman.university_management_system.student.exception.StudentNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -32,7 +37,8 @@ public class GlobalExceptionHandler {
             DepartmentNotFoundException.class,
             ProgramNotFoundException.class,
             CourseNotFoundException.class,
-            StudentNotFoundException.class
+            StudentNotFoundException.class,
+            EnrollmentNotFoundException.class
     })
     public ResponseEntity<Map<String, Object>> handleNotFound(
             RuntimeException exception
@@ -47,8 +53,12 @@ public class GlobalExceptionHandler {
             ProgramHasAssociatedCoursesException.class,
             ProgramHasAssociatedStudentsException.class,
             CourseCodeAlreadyExistsException.class,
+            CourseHasAssociatedEnrollmentsException.class,
             StudentIdAlreadyExistsException.class,
-            StudentEmailAlreadyExistsException.class
+            StudentEmailAlreadyExistsException.class,
+            StudentHasAssociatedEnrollmentsException.class,
+            EnrollmentAlreadyExistsException.class,
+            InvalidEnrollmentStatusTransitionException.class
     })
     public ResponseEntity<Map<String, Object>> handleConflict(
             RuntimeException exception

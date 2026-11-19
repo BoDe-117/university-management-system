@@ -1,5 +1,6 @@
 package com.abdulrahman.university_management_system.student.service;
 
+import com.abdulrahman.university_management_system.enrollment.repository.EnrollmentRepository;
 import com.abdulrahman.university_management_system.program.entity.Program;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
 import com.abdulrahman.university_management_system.program.repository.ProgramRepository;
@@ -38,6 +39,9 @@ class StudentUpdateDeleteServiceTest {
 
     @Mock
     private ProgramRepository programRepository;
+
+    @Mock
+    private EnrollmentRepository enrollmentRepository;
 
     @InjectMocks
     private StudentService studentService;
@@ -197,6 +201,7 @@ class StudentUpdateDeleteServiceTest {
         studentService.deleteStudent(id);
 
         verify(studentRepository).delete(student);
+        verify(studentRepository).flush();
     }
 
     @Test
