@@ -5,12 +5,16 @@ import com.abdulrahman.university_management_system.course.dto.CreateCourseReque
 import com.abdulrahman.university_management_system.course.dto.UpdateCourseRequest;
 import com.abdulrahman.university_management_system.course.entity.Course;
 import com.abdulrahman.university_management_system.course.exception.CourseCodeAlreadyExistsException;
+import com.abdulrahman.university_management_system.course.exception.CourseHasAssociatedEnrollmentsException;
 import com.abdulrahman.university_management_system.course.exception.CourseNotFoundException;
 import com.abdulrahman.university_management_system.course.repository.CourseRepository;
+import com.abdulrahman.university_management_system.enrollment.repository.EnrollmentRepository;
 import com.abdulrahman.university_management_system.program.entity.Program;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
 import com.abdulrahman.university_management_system.program.repository.ProgramRepository;
 import org.hibernate.exception.ConstraintViolationException;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,15 +28,21 @@ public class CourseService {
     private static final String COURSE_CODE_UNIQUE_CONSTRAINT =
             "uk_courses_code";
 
+    private static final String ENROLLMENT_COURSE_CONSTRAINT =
+            "fk_enrollments_course";
+
     private final CourseRepository courseRepository;
     private final ProgramRepository programRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     public CourseService(
             CourseRepository courseRepository,
-            ProgramRepository programRepository
+            ProgramRepository programRepository,
+            EnrollmentRepository enrollmentRepository
     ) {
         this.courseRepository = courseRepository;
         this.programRepository = programRepository;
+        this.enrollmentRepository = enrollmentRepository;
     }
 
     @Transactional
@@ -101,7 +111,20 @@ public class CourseService {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new CourseNotFoundException(id));
 
-        courseRepository.delete(course);
+        if (enrollmentRepository.existsByCourseId(id)) {
+            throw new CourseHasAssociatedEnrollmentsException(id);
+        }
+
+        try {
+            courseRepository.delete(course);
+            courseRepository.flush();
+        } catch (DataIntegrityViolationException exception) {
+            if (hasEnrollmentCourseConstraint(exception)) {
+                throw new CourseHasAssociatedEnrollmentsException(id);
+            }
+
+            throw exception;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -141,6 +164,36 @@ public class CourseService {
             return COURSE_CODE_UNIQUE_CONSTRAINT.equals(
                     constraintViolation.getConstraintName()
             );
+        }
+
+        return false;
+    }
+
+    private boolean hasEnrollmentCourseConstraint(
+            DataIntegrityViolationException exception
+    ) {
+        Throwable cause = exception;
+
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException constraintViolation
+                    && ENROLLMENT_COURSE_CONSTRAINT.equals(
+                    constraintViolation.getConstraintName()
+            )) {
+                return true;
+            }
+
+            if (cause instanceof PSQLException postgresException) {
+                ServerErrorMessage details = postgresException.getServerErrorMessage();
+
+                if (details != null
+                        && ENROLLMENT_COURSE_CONSTRAINT.equals(
+                        details.getConstraint()
+                )) {
+                    return true;
+                }
+            }
+
+            cause = cause.getCause();
         }
 
         return false;

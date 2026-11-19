@@ -1,5 +1,6 @@
 package com.abdulrahman.university_management_system.student.service;
 
+import com.abdulrahman.university_management_system.enrollment.repository.EnrollmentRepository;
 import com.abdulrahman.university_management_system.program.entity.Program;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
 import com.abdulrahman.university_management_system.program.repository.ProgramRepository;
@@ -8,10 +9,13 @@ import com.abdulrahman.university_management_system.student.dto.StudentResponse;
 import com.abdulrahman.university_management_system.student.dto.UpdateStudentRequest;
 import com.abdulrahman.university_management_system.student.entity.Student;
 import com.abdulrahman.university_management_system.student.exception.StudentEmailAlreadyExistsException;
+import com.abdulrahman.university_management_system.student.exception.StudentHasAssociatedEnrollmentsException;
 import com.abdulrahman.university_management_system.student.exception.StudentIdAlreadyExistsException;
 import com.abdulrahman.university_management_system.student.exception.StudentNotFoundException;
 import com.abdulrahman.university_management_system.student.repository.StudentRepository;
 import org.hibernate.exception.ConstraintViolationException;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,15 +32,21 @@ public class StudentService {
     private static final String STUDENT_EMAIL_CONSTRAINT =
             "uk_students_email";
 
+    private static final String ENROLLMENT_STUDENT_CONSTRAINT =
+            "fk_enrollments_student";
+
     private final StudentRepository studentRepository;
     private final ProgramRepository programRepository;
+    private final EnrollmentRepository enrollmentRepository;
 
     public StudentService(
             StudentRepository studentRepository,
-            ProgramRepository programRepository
+            ProgramRepository programRepository,
+            EnrollmentRepository enrollmentRepository
     ) {
         this.studentRepository = studentRepository;
         this.programRepository = programRepository;
+        this.enrollmentRepository = enrollmentRepository;
     }
 
     @Transactional
@@ -127,7 +137,20 @@ public class StudentService {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new StudentNotFoundException(id));
 
-        studentRepository.delete(student);
+        if (enrollmentRepository.existsByStudentId(id)) {
+            throw new StudentHasAssociatedEnrollmentsException(id);
+        }
+
+        try {
+            studentRepository.delete(student);
+            studentRepository.flush();
+        } catch (DataIntegrityViolationException exception) {
+            if (hasEnrollmentStudentConstraint(exception)) {
+                throw new StudentHasAssociatedEnrollmentsException(id);
+            }
+
+            throw exception;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -165,6 +188,36 @@ public class StudentService {
         }
 
         return null;
+    }
+
+    private boolean hasEnrollmentStudentConstraint(
+            DataIntegrityViolationException exception
+    ) {
+        Throwable cause = exception;
+
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException constraintViolation
+                    && ENROLLMENT_STUDENT_CONSTRAINT.equals(
+                    constraintViolation.getConstraintName()
+            )) {
+                return true;
+            }
+
+            if (cause instanceof PSQLException postgresException) {
+                ServerErrorMessage details = postgresException.getServerErrorMessage();
+
+                if (details != null
+                        && ENROLLMENT_STUDENT_CONSTRAINT.equals(
+                        details.getConstraint()
+                )) {
+                    return true;
+                }
+            }
+
+            cause = cause.getCause();
+        }
+
+        return false;
     }
 
     private StudentResponse toResponse(Student student) {
