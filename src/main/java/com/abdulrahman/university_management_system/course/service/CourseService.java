@@ -1,5 +1,6 @@
 package com.abdulrahman.university_management_system.course.service;
 
+import com.abdulrahman.university_management_system.common.pagination.PaginationValidator;
 import com.abdulrahman.university_management_system.course.dto.CourseResponse;
 import com.abdulrahman.university_management_system.course.dto.CreateCourseRequest;
 import com.abdulrahman.university_management_system.course.dto.UpdateCourseRequest;
@@ -16,10 +17,13 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -31,18 +35,25 @@ public class CourseService {
     private static final String ENROLLMENT_COURSE_CONSTRAINT =
             "fk_enrollments_course";
 
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "id", "code", "name", "credits", "createdAt", "updatedAt"
+    );
+
     private final CourseRepository courseRepository;
     private final ProgramRepository programRepository;
     private final EnrollmentRepository enrollmentRepository;
+    private final PaginationValidator paginationValidator;
 
     public CourseService(
             CourseRepository courseRepository,
             ProgramRepository programRepository,
-            EnrollmentRepository enrollmentRepository
+            EnrollmentRepository enrollmentRepository,
+            PaginationValidator paginationValidator
     ) {
         this.courseRepository = courseRepository;
         this.programRepository = programRepository;
         this.enrollmentRepository = enrollmentRepository;
+        this.paginationValidator = paginationValidator;
     }
 
     @Transactional
@@ -155,6 +166,25 @@ public class CourseService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public Page<CourseResponse> getCourses(UUID programId, Pageable pageable) {
+        Pageable validatedPageable =
+                paginationValidator.validate(pageable, ALLOWED_SORT_FIELDS);
+
+        if (programId == null) {
+            return courseRepository.findAll(validatedPageable)
+                    .map(this::toResponse);
+        }
+
+        if (!programRepository.existsById(programId)) {
+            throw new ProgramNotFoundException(programId);
+        }
+
+        return courseRepository
+                .findAllByProgramId(programId, validatedPageable)
+                .map(this::toResponse);
+    }
+
     private boolean isDuplicateCodeViolation(
             DataIntegrityViolationException exception
     ) {
@@ -183,7 +213,8 @@ public class CourseService {
             }
 
             if (cause instanceof PSQLException postgresException) {
-                ServerErrorMessage details = postgresException.getServerErrorMessage();
+                ServerErrorMessage details =
+                        postgresException.getServerErrorMessage();
 
                 if (details != null
                         && ENROLLMENT_COURSE_CONSTRAINT.equals(

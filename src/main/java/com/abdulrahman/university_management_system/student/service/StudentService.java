@@ -1,5 +1,6 @@
 package com.abdulrahman.university_management_system.student.service;
 
+import com.abdulrahman.university_management_system.common.pagination.PaginationValidator;
 import com.abdulrahman.university_management_system.enrollment.repository.EnrollmentRepository;
 import com.abdulrahman.university_management_system.program.entity.Program;
 import com.abdulrahman.university_management_system.program.exception.ProgramNotFoundException;
@@ -19,10 +20,13 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -40,21 +44,29 @@ public class StudentService {
     private static final String USER_STUDENT_CONSTRAINT =
             "fk_users_student";
 
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "id", "studentId", "firstName", "lastName",
+            "email", "createdAt", "updatedAt"
+    );
+
     private final StudentRepository studentRepository;
     private final ProgramRepository programRepository;
     private final EnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
+    private final PaginationValidator paginationValidator;
 
     public StudentService(
             StudentRepository studentRepository,
             ProgramRepository programRepository,
             EnrollmentRepository enrollmentRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            PaginationValidator paginationValidator
     ) {
         this.studentRepository = studentRepository;
         this.programRepository = programRepository;
         this.enrollmentRepository = enrollmentRepository;
         this.userRepository = userRepository;
+        this.paginationValidator = paginationValidator;
     }
 
     @Transactional
@@ -197,6 +209,28 @@ public class StudentService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public Page<StudentResponse> getStudents(
+            UUID programId,
+            Pageable pageable
+    ) {
+        Pageable validatedPageable =
+                paginationValidator.validate(pageable, ALLOWED_SORT_FIELDS);
+
+        if (programId == null) {
+            return studentRepository.findAll(validatedPageable)
+                    .map(this::toResponse);
+        }
+
+        if (!programRepository.existsById(programId)) {
+            throw new ProgramNotFoundException(programId);
+        }
+
+        return studentRepository
+                .findAllByProgramId(programId, validatedPageable)
+                .map(this::toResponse);
+    }
+
     private String getConstraintName(DataIntegrityViolationException exception) {
         if (exception.getCause()
                 instanceof ConstraintViolationException constraintViolation) {
@@ -214,14 +248,18 @@ public class StudentService {
 
         while (cause != null) {
             if (cause instanceof ConstraintViolationException constraintViolation
-                    && constraintName.equals(constraintViolation.getConstraintName())) {
+                    && constraintName.equals(
+                    constraintViolation.getConstraintName()
+            )) {
                 return true;
             }
 
             if (cause instanceof PSQLException postgresException) {
-                ServerErrorMessage details = postgresException.getServerErrorMessage();
+                ServerErrorMessage details =
+                        postgresException.getServerErrorMessage();
 
-                if (details != null && constraintName.equals(details.getConstraint())) {
+                if (details != null
+                        && constraintName.equals(details.getConstraint())) {
                     return true;
                 }
             }

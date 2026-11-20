@@ -1,5 +1,6 @@
 package com.abdulrahman.university_management_system.department.service;
 
+import com.abdulrahman.university_management_system.common.pagination.PaginationValidator;
 import com.abdulrahman.university_management_system.department.dto.CreateDepartmentRequest;
 import com.abdulrahman.university_management_system.department.dto.DepartmentResponse;
 import com.abdulrahman.university_management_system.department.dto.UpdateDepartmentRequest;
@@ -13,10 +14,13 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -28,15 +32,22 @@ public class DepartmentService {
     private static final String PROGRAM_DEPARTMENT_FOREIGN_KEY =
             "fk_programs_department";
 
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "id", "code", "name", "createdAt", "updatedAt"
+    );
+
     private final DepartmentRepository departmentRepository;
     private final ProgramRepository programRepository;
+    private final PaginationValidator paginationValidator;
 
     public DepartmentService(
             DepartmentRepository departmentRepository,
-            ProgramRepository programRepository
+            ProgramRepository programRepository,
+            PaginationValidator paginationValidator
     ) {
         this.departmentRepository = departmentRepository;
         this.programRepository = programRepository;
+        this.paginationValidator = paginationValidator;
     }
 
     @Transactional
@@ -124,6 +135,15 @@ public class DepartmentService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public Page<DepartmentResponse> getAllDepartments(Pageable pageable) {
+        Pageable validatedPageable =
+                paginationValidator.validate(pageable, ALLOWED_SORT_FIELDS);
+
+        return departmentRepository.findAll(validatedPageable)
+                .map(this::toResponse);
+    }
+
     private boolean isDuplicateCodeViolation(DataIntegrityViolationException e) {
         if (e.getCause() instanceof ConstraintViolationException cve) {
             return DEPARTMENT_CODE_UNIQUE_CONSTRAINT.equals(
@@ -174,4 +194,3 @@ public class DepartmentService {
         );
     }
 }
-

@@ -1,5 +1,6 @@
 package com.abdulrahman.university_management_system.enrollment.service;
 
+import com.abdulrahman.university_management_system.common.pagination.PaginationValidator;
 import com.abdulrahman.university_management_system.course.entity.Course;
 import com.abdulrahman.university_management_system.course.exception.CourseNotFoundException;
 import com.abdulrahman.university_management_system.course.repository.CourseRepository;
@@ -25,6 +26,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -33,21 +35,28 @@ public class EnrollmentService {
     private static final String STUDENT_COURSE_UNIQUE_CONSTRAINT =
             "uk_enrollments_student_course";
 
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "id", "status", "enrolledAt", "createdAt", "updatedAt"
+    );
+
     private final EnrollmentRepository enrollmentRepository;
     private final StudentRepository studentRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final PaginationValidator paginationValidator;
 
     public EnrollmentService(
             EnrollmentRepository enrollmentRepository,
             StudentRepository studentRepository,
             CourseRepository courseRepository,
-            UserRepository userRepository
+            UserRepository userRepository,
+            PaginationValidator paginationValidator
     ) {
         this.enrollmentRepository = enrollmentRepository;
         this.studentRepository = studentRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
+        this.paginationValidator = paginationValidator;
     }
 
     @Transactional
@@ -118,26 +127,29 @@ public class EnrollmentService {
             throw new AccessDeniedException("Access denied");
         }
 
+        Pageable validatedPageable =
+                paginationValidator.validate(pageable, ALLOWED_SORT_FIELDS);
+
         Page<Enrollment> enrollments;
 
         if (studentId != null && courseId != null) {
             enrollments = enrollmentRepository.findAllByStudentIdAndCourseId(
                     studentId,
                     courseId,
-                    pageable
+                    validatedPageable
             );
         } else if (studentId != null) {
             enrollments = enrollmentRepository.findAllByStudentId(
                     studentId,
-                    pageable
+                    validatedPageable
             );
         } else if (courseId != null) {
             enrollments = enrollmentRepository.findAllByCourseId(
                     courseId,
-                    pageable
+                    validatedPageable
             );
         } else {
-            enrollments = enrollmentRepository.findAll(pageable);
+            enrollments = enrollmentRepository.findAll(validatedPageable);
         }
 
         return enrollments.map(this::toResponse);

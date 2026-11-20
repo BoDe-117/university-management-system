@@ -5,6 +5,9 @@ import com.abdulrahman.university_management_system.department.dto.DepartmentRes
 import com.abdulrahman.university_management_system.department.dto.UpdateDepartmentRequest;
 import com.abdulrahman.university_management_system.department.service.DepartmentService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -64,8 +66,12 @@ public class DepartmentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<DepartmentResponse>> getAllDepartments() {
-        List<DepartmentResponse> departments = departmentService.getAllDepartments();
+    public ResponseEntity<Page<DepartmentResponse>> getAllDepartments(
+            @PageableDefault(size = 20, sort = "id") Pageable pageable
+    ) {
+        Page<DepartmentResponse> departments =
+                departmentService.getAllDepartments(pageable);
+
         return ResponseEntity.ok(departments);
     }
 }

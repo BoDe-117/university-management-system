@@ -5,6 +5,9 @@ import com.abdulrahman.university_management_system.course.dto.CreateCourseReque
 import com.abdulrahman.university_management_system.course.dto.UpdateCourseRequest;
 import com.abdulrahman.university_management_system.course.service.CourseService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -64,16 +66,12 @@ public class CourseController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CourseResponse>> getCourses(
-            @RequestParam(required = false) UUID programId
+    public ResponseEntity<Page<CourseResponse>> getCourses(
+            @RequestParam(required = false) UUID programId,
+            @PageableDefault(size = 20, sort = "id") Pageable pageable
     ) {
-        List<CourseResponse> courses;
-
-        if (programId == null) {
-            courses = courseService.getAllCourses();
-        } else {
-            courses = courseService.getCoursesByProgramId(programId);
-        }
+        Page<CourseResponse> courses =
+                courseService.getCourses(programId, pageable);
 
         return ResponseEntity.ok(courses);
     }

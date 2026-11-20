@@ -1,5 +1,6 @@
 package com.abdulrahman.university_management_system.common.exception;
 
+import com.abdulrahman.university_management_system.common.pagination.InvalidPaginationException;
 import com.abdulrahman.university_management_system.course.exception.CourseCodeAlreadyExistsException;
 import com.abdulrahman.university_management_system.course.exception.CourseHasAssociatedEnrollmentsException;
 import com.abdulrahman.university_management_system.course.exception.CourseNotFoundException;
@@ -76,9 +77,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             InvalidPasswordException.class,
-            InvalidUserStudentAssociationException.class
+            InvalidUserStudentAssociationException.class,
+            InvalidPaginationException.class
     })
-    public ResponseEntity<Map<String, Object>> handleInvalidUserRequest(
+    public ResponseEntity<Map<String, Object>> handleInvalidRequest(
             RuntimeException exception
     ) {
         return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage());

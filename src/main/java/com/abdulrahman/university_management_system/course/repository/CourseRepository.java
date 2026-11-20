@@ -1,6 +1,8 @@
 package com.abdulrahman.university_management_system.course.repository;
 
 import com.abdulrahman.university_management_system.course.entity.Course;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -13,6 +15,8 @@ public interface CourseRepository extends JpaRepository<Course, UUID> {
     boolean existsByCodeAndIdNot(String code, UUID id);
 
     List<Course> findAllByProgramId(UUID programId);
+
+    Page<Course> findAllByProgramId(UUID programId, Pageable pageable);
 
     boolean existsByProgramId(UUID programId);
 }
