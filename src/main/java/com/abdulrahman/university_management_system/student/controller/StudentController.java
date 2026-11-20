@@ -5,6 +5,9 @@ import com.abdulrahman.university_management_system.student.dto.StudentResponse;
 import com.abdulrahman.university_management_system.student.dto.UpdateStudentRequest;
 import com.abdulrahman.university_management_system.student.service.StudentService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -70,16 +72,12 @@ public class StudentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<StudentResponse>> getStudents(
-            @RequestParam(required = false) UUID programId
+    public ResponseEntity<Page<StudentResponse>> getStudents(
+            @RequestParam(required = false) UUID programId,
+            @PageableDefault(size = 20, sort = "id") Pageable pageable
     ) {
-        List<StudentResponse> students;
-
-        if (programId == null) {
-            students = studentService.getAllStudents();
-        } else {
-            students = studentService.getStudentsByProgramId(programId);
-        }
+        Page<StudentResponse> students =
+                studentService.getStudents(programId, pageable);
 
         return ResponseEntity.ok(students);
     }

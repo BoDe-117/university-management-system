@@ -1,6 +1,8 @@
 package com.abdulrahman.university_management_system.student.repository;
 
 import com.abdulrahman.university_management_system.student.entity.Student;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -19,4 +21,6 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
     boolean existsByProgramId(UUID programId);
 
     List<Student> findAllByProgramId(UUID programId);
+
+    Page<Student> findAllByProgramId(UUID programId, Pageable pageable);
 }

@@ -5,6 +5,9 @@ import com.abdulrahman.university_management_system.program.dto.ProgramResponse;
 import com.abdulrahman.university_management_system.program.dto.UpdateProgramRequest;
 import com.abdulrahman.university_management_system.program.service.ProgramService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,7 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -69,17 +71,12 @@ public class ProgramController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProgramResponse>> getPrograms(
-            @RequestParam(required = false) UUID departmentId
+    public ResponseEntity<Page<ProgramResponse>> getPrograms(
+            @RequestParam(required = false) UUID departmentId,
+            @PageableDefault(size = 20, sort = "id") Pageable pageable
     ) {
-        List<ProgramResponse> programs;
-
-        if (departmentId == null) {
-            programs = programService.getAllPrograms();
-        } else {
-            programs =
-                    programService.getProgramsByDepartmentId(departmentId);
-        }
+        Page<ProgramResponse> programs =
+                programService.getPrograms(departmentId, pageable);
 
         return ResponseEntity.ok(programs);
     }

@@ -1,5 +1,6 @@
 package com.abdulrahman.university_management_system.program.service;
 
+import com.abdulrahman.university_management_system.common.pagination.PaginationValidator;
 import com.abdulrahman.university_management_system.course.repository.CourseRepository;
 import com.abdulrahman.university_management_system.department.entity.Department;
 import com.abdulrahman.university_management_system.department.exception.DepartmentNotFoundException;
@@ -18,10 +19,13 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -36,21 +40,28 @@ public class ProgramService {
     private static final String STUDENT_PROGRAM_FOREIGN_KEY =
             "fk_students_program";
 
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "id", "code", "name", "createdAt", "updatedAt"
+    );
+
     private final ProgramRepository programRepository;
     private final DepartmentRepository departmentRepository;
     private final CourseRepository courseRepository;
     private final StudentRepository studentRepository;
+    private final PaginationValidator paginationValidator;
 
     public ProgramService(
             ProgramRepository programRepository,
             DepartmentRepository departmentRepository,
             CourseRepository courseRepository,
-            StudentRepository studentRepository
+            StudentRepository studentRepository,
+            PaginationValidator paginationValidator
     ) {
         this.programRepository = programRepository;
         this.departmentRepository = departmentRepository;
         this.courseRepository = courseRepository;
         this.studentRepository = studentRepository;
+        this.paginationValidator = paginationValidator;
     }
 
     @Transactional
@@ -135,11 +146,15 @@ public class ProgramService {
             programRepository.flush();
         } catch (DataIntegrityViolationException exception) {
             if (hasConstraint(exception, COURSE_PROGRAM_FOREIGN_KEY)) {
-                throw new ProgramHasAssociatedCoursesException(program.getCode());
+                throw new ProgramHasAssociatedCoursesException(
+                        program.getCode()
+                );
             }
 
             if (hasConstraint(exception, STUDENT_PROGRAM_FOREIGN_KEY)) {
-                throw new ProgramHasAssociatedStudentsException(program.getCode());
+                throw new ProgramHasAssociatedStudentsException(
+                        program.getCode()
+                );
             }
 
             throw exception;
@@ -174,6 +189,28 @@ public class ProgramService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public Page<ProgramResponse> getPrograms(
+            UUID departmentId,
+            Pageable pageable
+    ) {
+        Pageable validatedPageable =
+                paginationValidator.validate(pageable, ALLOWED_SORT_FIELDS);
+
+        if (departmentId == null) {
+            return programRepository.findAll(validatedPageable)
+                    .map(this::toResponse);
+        }
+
+        if (!departmentRepository.existsById(departmentId)) {
+            throw new DepartmentNotFoundException(departmentId);
+        }
+
+        return programRepository
+                .findAllByDepartmentId(departmentId, validatedPageable)
+                .map(this::toResponse);
+    }
+
     private boolean isDuplicateCodeViolation(
             DataIntegrityViolationException exception
     ) {
@@ -196,7 +233,9 @@ public class ProgramService {
 
         while (cause != null) {
             if (cause instanceof ConstraintViolationException constraintViolation
-                    && constraintName.equals(constraintViolation.getConstraintName())) {
+                    && constraintName.equals(
+                    constraintViolation.getConstraintName()
+            )) {
                 return true;
             }
 

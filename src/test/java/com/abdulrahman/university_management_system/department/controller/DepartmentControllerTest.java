@@ -7,6 +7,9 @@ import com.abdulrahman.university_management_system.department.service.Departmen
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,8 +35,6 @@ class DepartmentControllerTest {
 
     @MockitoBean
     private DepartmentService departmentService;
-
-    // POST /api/v1/departments
 
     @Test
     void createDepartment_returns201WithLocationHeader() throws Exception {
@@ -96,6 +97,7 @@ class DepartmentControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Validation failed"))
                 .andExpect(jsonPath("$.fieldErrors.name").exists());
     }
 
@@ -189,8 +191,6 @@ class DepartmentControllerTest {
                         .value("Malformed or missing request body"));
     }
 
-    // GET /api/v1/departments/{id}
-
     @Test
     void getDepartmentById_returns200_whenDepartmentExists() throws Exception {
         UUID id = UUID.randomUUID();
@@ -230,10 +230,8 @@ class DepartmentControllerTest {
                 .andExpect(jsonPath("$.timestamp").exists());
     }
 
-    // GET /api/v1/departments
-
     @Test
-    void getAllDepartments_returns200_withList() throws Exception {
+    void getAllDepartments_returns200_withPage() throws Exception {
         DepartmentResponse cs = new DepartmentResponse(
                 UUID.randomUUID(), "CS", "Computer Science",
                 Instant.now(), Instant.now());
@@ -242,21 +240,25 @@ class DepartmentControllerTest {
                 UUID.randomUUID(), "SE", "Software Engineering",
                 Instant.now(), Instant.now());
 
-        when(departmentService.getAllDepartments()).thenReturn(List.of(cs, se));
+        Page<DepartmentResponse> page = new PageImpl<>(List.of(cs, se));
+
+        when(departmentService.getAllDepartments(any(Pageable.class)))
+                .thenReturn(page);
 
         mockMvc.perform(get("/api/v1/departments"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].code").value("CS"))
-                .andExpect(jsonPath("$[1].code").value("SE"));
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].code").value("CS"))
+                .andExpect(jsonPath("$.content[1].code").value("SE"));
     }
 
     @Test
-    void getAllDepartments_returns200_withEmptyList() throws Exception {
-        when(departmentService.getAllDepartments()).thenReturn(List.of());
+    void getAllDepartments_returns200_withEmptyPage() throws Exception {
+        when(departmentService.getAllDepartments(any(Pageable.class)))
+                .thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/v1/departments"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
     }
 }

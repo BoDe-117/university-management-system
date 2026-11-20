@@ -48,11 +48,18 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
 
                         .requestMatchers(
+                                HttpMethod.GET,
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**"
+                        ).permitAll()
+
+                        .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/auth/login"
                         ).permitAll()
 
-                        // Only administrators can create user accounts.
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/users"
@@ -86,6 +93,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.GET,
+                                "/api/v1/enrollments",
                                 "/api/v1/enrollments/*"
                         ).hasAnyRole("ADMIN", "STAFF", "STUDENT")
 
@@ -120,7 +128,10 @@ public class SecurityConfig {
 
                         .anyRequest().denyAll()
                 )
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(
+                        jwtFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                );
 
         return http.build();
     }

@@ -8,6 +8,9 @@ import com.abdulrahman.university_management_system.program.service.ProgramServi
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -17,6 +20,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -263,7 +268,7 @@ class ProgramControllerTest {
     }
 
     @Test
-    void getAllPrograms_returns200WithList() throws Exception {
+    void getAllPrograms_returns200WithPage() throws Exception {
         ProgramResponse firstProgram = programResponse(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
@@ -278,31 +283,34 @@ class ProgramControllerTest {
                 "BSc in Computer Science"
         );
 
-        when(programService.getAllPrograms())
-                .thenReturn(List.of(firstProgram, secondProgram));
+        when(programService.getPrograms(isNull(), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(
+                        List.of(firstProgram, secondProgram)
+                ));
 
         mockMvc.perform(get("/api/v1/programs"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].code").value("BSC-SE"))
-                .andExpect(jsonPath("$[1].code").value("BSC-CS"));
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[0].code").value("BSC-SE"))
+                .andExpect(jsonPath("$.content[1].code").value("BSC-CS"));
 
-        verify(programService).getAllPrograms();
+        verify(programService).getPrograms(isNull(), any(Pageable.class));
     }
 
     @Test
-    void getAllPrograms_returns200WithEmptyList() throws Exception {
-        when(programService.getAllPrograms()).thenReturn(List.of());
+    void getAllPrograms_returns200WithEmptyPage() throws Exception {
+        when(programService.getPrograms(isNull(), any(Pageable.class)))
+                .thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/v1/programs"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
 
-        verify(programService).getAllPrograms();
+        verify(programService).getPrograms(isNull(), any(Pageable.class));
     }
 
     @Test
-    void getProgramsByDepartment_returns200WithFilteredList()
+    void getProgramsByDepartment_returns200WithFilteredPage()
             throws Exception {
         UUID departmentId = UUID.randomUUID();
 
@@ -313,34 +321,36 @@ class ProgramControllerTest {
                 "BSc in Software Engineering"
         );
 
-        when(programService.getProgramsByDepartmentId(departmentId))
-                .thenReturn(List.of(response));
+        when(programService.getPrograms(eq(departmentId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(response)));
 
         mockMvc.perform(get("/api/v1/programs")
                         .queryParam("departmentId", departmentId.toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].code").value("BSC-SE"))
-                .andExpect(jsonPath("$[0].departmentId")
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].code").value("BSC-SE"))
+                .andExpect(jsonPath("$.content[0].departmentId")
                         .value(departmentId.toString()));
 
-        verify(programService).getProgramsByDepartmentId(departmentId);
+        verify(programService)
+                .getPrograms(eq(departmentId), any(Pageable.class));
     }
 
     @Test
-    void getProgramsByDepartment_returns200WithEmptyList()
+    void getProgramsByDepartment_returns200WithEmptyPage()
             throws Exception {
         UUID departmentId = UUID.randomUUID();
 
-        when(programService.getProgramsByDepartmentId(departmentId))
-                .thenReturn(List.of());
+        when(programService.getPrograms(eq(departmentId), any(Pageable.class)))
+                .thenReturn(Page.empty());
 
         mockMvc.perform(get("/api/v1/programs")
                         .queryParam("departmentId", departmentId.toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.content.length()").value(0));
 
-        verify(programService).getProgramsByDepartmentId(departmentId);
+        verify(programService)
+                .getPrograms(eq(departmentId), any(Pageable.class));
     }
 
     @Test
@@ -348,7 +358,7 @@ class ProgramControllerTest {
             throws Exception {
         UUID departmentId = UUID.randomUUID();
 
-        when(programService.getProgramsByDepartmentId(departmentId))
+        when(programService.getPrograms(eq(departmentId), any(Pageable.class)))
                 .thenThrow(new DepartmentNotFoundException(departmentId));
 
         mockMvc.perform(get("/api/v1/programs")

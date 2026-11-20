@@ -2,6 +2,8 @@ package com.abdulrahman.university_management_system.enrollment.repository;
 
 import com.abdulrahman.university_management_system.enrollment.entity.Enrollment;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -22,6 +24,16 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     List<Enrollment> findAllByStudentId(UUID studentId);
 
     List<Enrollment> findAllByCourseId(UUID courseId);
+
+    Page<Enrollment> findAllByStudentId(UUID studentId, Pageable pageable);
+
+    Page<Enrollment> findAllByCourseId(UUID courseId, Pageable pageable);
+
+    Page<Enrollment> findAllByStudentIdAndCourseId(
+            UUID studentId,
+            UUID courseId,
+            Pageable pageable
+    );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM Enrollment e WHERE e.id = :id")
