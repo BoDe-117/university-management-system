@@ -52,7 +52,6 @@ public class SecurityConfig {
                                 "/api/v1/auth/login"
                         ).permitAll()
 
-                        // Only administrators can create user accounts.
                         .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/v1/users"
@@ -86,6 +85,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 HttpMethod.GET,
+                                "/api/v1/enrollments",
                                 "/api/v1/enrollments/*"
                         ).hasAnyRole("ADMIN", "STAFF", "STUDENT")
 

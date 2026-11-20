@@ -14,8 +14,14 @@ import com.abdulrahman.university_management_system.enrollment.repository.Enroll
 import com.abdulrahman.university_management_system.student.entity.Student;
 import com.abdulrahman.university_management_system.student.exception.StudentNotFoundException;
 import com.abdulrahman.university_management_system.student.repository.StudentRepository;
+import com.abdulrahman.university_management_system.user.entity.User;
+import com.abdulrahman.university_management_system.user.entity.UserRole;
+import com.abdulrahman.university_management_system.user.repository.UserRepository;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,15 +36,18 @@ public class EnrollmentService {
     private final EnrollmentRepository enrollmentRepository;
     private final StudentRepository studentRepository;
     private final CourseRepository courseRepository;
+    private final UserRepository userRepository;
 
     public EnrollmentService(
             EnrollmentRepository enrollmentRepository,
             StudentRepository studentRepository,
-            CourseRepository courseRepository
+            CourseRepository courseRepository,
+            UserRepository userRepository
     ) {
         this.enrollmentRepository = enrollmentRepository;
         this.studentRepository = studentRepository;
         this.courseRepository = courseRepository;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -74,6 +83,64 @@ public class EnrollmentService {
 
             throw exception;
         }
+    }
+
+    @Transactional(readOnly = true)
+    public Page<EnrollmentResponse> getEnrollments(
+            UUID studentId,
+            UUID courseId,
+            UUID userId,
+            Pageable pageable
+    ) {
+        if (userId == null) {
+            throw new AccessDeniedException("Access denied");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new AccessDeniedException("Access denied"));
+
+        if (user.getRole() == UserRole.STUDENT) {
+            Student student = user.getStudent();
+
+            if (student == null) {
+                throw new AccessDeniedException("Access denied");
+            }
+
+            UUID ownStudentId = student.getId();
+
+            if (studentId != null && !studentId.equals(ownStudentId)) {
+                throw new AccessDeniedException("Access denied");
+            }
+
+            studentId = ownStudentId;
+        } else if (user.getRole() != UserRole.ADMIN
+                && user.getRole() != UserRole.STAFF) {
+            throw new AccessDeniedException("Access denied");
+        }
+
+        Page<Enrollment> enrollments;
+
+        if (studentId != null && courseId != null) {
+            enrollments = enrollmentRepository.findAllByStudentIdAndCourseId(
+                    studentId,
+                    courseId,
+                    pageable
+            );
+        } else if (studentId != null) {
+            enrollments = enrollmentRepository.findAllByStudentId(
+                    studentId,
+                    pageable
+            );
+        } else if (courseId != null) {
+            enrollments = enrollmentRepository.findAllByCourseId(
+                    courseId,
+                    pageable
+            );
+        } else {
+            enrollments = enrollmentRepository.findAll(pageable);
+        }
+
+        return enrollments.map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
