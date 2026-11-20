@@ -46,7 +46,78 @@ public class SecurityConfig {
                         )
                 )
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/auth/login"
+                        ).permitAll()
+
+                        // Only administrators can create user accounts.
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/users"
+                        ).hasRole("ADMIN")
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/departments",
+                                "/api/v1/departments/*",
+                                "/api/v1/programs",
+                                "/api/v1/programs/*",
+                                "/api/v1/courses",
+                                "/api/v1/courses/*"
+                        ).hasAnyRole("ADMIN", "STAFF", "STUDENT")
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/students"
+                        ).hasAnyRole("ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/students/*"
+                        ).hasAnyRole("ADMIN", "STAFF", "STUDENT")
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/enrollments",
+                                "/api/v1/enrollments/*/drop"
+                        ).hasAnyRole("ADMIN", "STAFF", "STUDENT")
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/enrollments/*"
+                        ).hasAnyRole("ADMIN", "STAFF", "STUDENT")
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/enrollments/*/complete"
+                        ).hasAnyRole("ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/v1/departments",
+                                "/api/v1/programs",
+                                "/api/v1/courses",
+                                "/api/v1/students"
+                        ).hasAnyRole("ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                HttpMethod.PUT,
+                                "/api/v1/departments/*",
+                                "/api/v1/programs/*",
+                                "/api/v1/courses/*",
+                                "/api/v1/students/*"
+                        ).hasAnyRole("ADMIN", "STAFF")
+
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/api/v1/departments/*",
+                                "/api/v1/programs/*",
+                                "/api/v1/courses/*",
+                                "/api/v1/students/*"
+                        ).hasRole("ADMIN")
+
                         .anyRequest().denyAll()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

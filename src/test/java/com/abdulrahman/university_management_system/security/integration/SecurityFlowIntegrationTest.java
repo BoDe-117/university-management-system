@@ -106,8 +106,7 @@ class SecurityFlowIntegrationTest {
     }
 
     @Test
-    void validToken_isAuthenticatedButOtherEndpointsRemainDenied()
-            throws Exception {
+    void validAdminToken_canAccessDepartments() throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validLogin()))
@@ -121,7 +120,7 @@ class SecurityFlowIntegrationTest {
 
         mockMvc.perform(get("/api/v1/departments")
                         .header("Authorization", "Bearer " + token))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     private String validLogin() {
