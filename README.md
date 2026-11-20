@@ -6,11 +6,13 @@ students, and enrollments. Built as a portfolio project with Java and Spring Boo
 ## Current Features
 
 - Manage departments, programs, courses, and students.
-- Enroll students in courses and retrieve individual enrollments.
+- Enroll students in courses and list or retrieve enrollments.
 - Drop or complete enrollments with controlled status transitions.
 - Prevent duplicate enrollments and protect referenced records from deletion.
 - Authenticate users with JWT access tokens.
 - Restrict API access by role and check ownership for student data.
+- Browse paginated lists with sorting and supported filters.
+- Explore the API with Swagger UI.
 - Apply database migrations with Flyway.
 - Run automated unit, controller, PostgreSQL integration, and concurrency tests.
 
@@ -23,6 +25,7 @@ students, and enrollments. Built as a portfolio project with Java and Spring Boo
 - PostgreSQL 18
 - Flyway
 - JWT
+- Springdoc OpenAPI and Swagger UI
 - JUnit, Mockito, MockMvc, and Testcontainers
 - Maven Wrapper
 - GitHub Actions
@@ -33,10 +36,18 @@ students, and enrollments. Built as a portfolio project with Java and Spring Boo
 - Docker Desktop, or a compatible Docker environment with Linux containers
 - Git
 
-Check the Java version used by Maven:
+Check the Java version used by Maven.
+
+PowerShell:
 
 ```powershell
 .\mvnw.cmd -version
+```
+
+Bash:
+
+```bash
+./mvnw -version
 ```
 
 ## Getting Started
@@ -84,6 +95,12 @@ $jwtRandom.Dispose()
 $env:JWT_SECRET = [Convert]::ToBase64String($jwtKeyBytes)
 ```
 
+For a temporary Bash session with OpenSSL installed:
+
+```bash
+export JWT_SECRET="$(openssl rand -base64 32)"
+```
+
 This value lasts only for the current terminal session. Changing the secret
 invalidates previously issued tokens. For a deployment, provide a securely
 stored, stable secret through the deployment environment.
@@ -93,7 +110,9 @@ stored, stable secret through the deployment environment.
 The `bootstrap-admin` profile creates an administrator only if one does not
 already exist. It is disabled during normal startup.
 
-In the same PowerShell session, set a username and enter a password securely:
+Use a password of at least 12 characters and no more than 72 UTF-8 bytes.
+
+In PowerShell, set a username and enter a password securely:
 
 ```powershell
 $env:BOOTSTRAP_ADMIN_USERNAME = Read-Host "Administrator username"
@@ -107,8 +126,6 @@ finally {
     [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($adminPasswordPointer)
 }
 ```
-
-Use a password of at least 12 characters and no more than 72 UTF-8 bytes.
 
 Start the application with the bootstrap profile:
 
@@ -125,6 +142,24 @@ Remove-Item Env:BOOTSTRAP_ADMIN_PASSWORD -ErrorAction SilentlyContinue
 Remove-Variable adminSecurePassword, adminPasswordPointer -ErrorAction SilentlyContinue
 ```
 
+For Bash, set the credentials and start with the bootstrap profile:
+
+```bash
+read -r -p "Administrator username: " BOOTSTRAP_ADMIN_USERNAME
+read -r -s -p "Administrator password: " BOOTSTRAP_ADMIN_PASSWORD
+echo
+export BOOTSTRAP_ADMIN_USERNAME BOOTSTRAP_ADMIN_PASSWORD
+
+./mvnw spring-boot:run -Dspring-boot.run.profiles=bootstrap-admin
+```
+
+After the administrator is created, stop the application with `Ctrl+C` and
+remove the credentials from the session:
+
+```bash
+unset BOOTSTRAP_ADMIN_USERNAME BOOTSTRAP_ADMIN_PASSWORD
+```
+
 Run the bootstrap profile only for initial setup. Start the application
 normally afterward, without that profile. If an administrator already exists,
 the bootstrap operation skips account creation.
@@ -136,8 +171,16 @@ secret-management mechanism for deployments.
 
 In the same terminal session, with `JWT_SECRET` set:
 
+PowerShell:
+
 ```powershell
 .\mvnw.cmd spring-boot:run
+```
+
+Bash:
+
+```bash
+./mvnw spring-boot:run
 ```
 
 The API listens on `http://localhost:8081`. Running from an IntelliJ run
@@ -147,12 +190,33 @@ configuration requires setting `JWT_SECRET` in that configuration as well.
 
 Start Docker Desktop, then run:
 
+PowerShell:
+
 ```powershell
 .\mvnw.cmd "-DJWT_SECRET=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" clean test
 ```
 
-The value in this command is a public **test-only key**. Never use it for a
+Bash:
+
+```bash
+JWT_SECRET=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY= ./mvnw clean test
+```
+
+The value in these commands is a public **test-only key**. Never use it for a
 real deployment. GitHub Actions also uses a separate test configuration.
+
+### 7. Browse the API documentation
+
+Start the application, then open:
+
+[Swagger UI](http://localhost:8081/swagger-ui.html)
+
+The OpenAPI document is available at:
+
+[OpenAPI JSON](http://localhost:8081/v3/api-docs)
+
+Use the login endpoint to obtain an access token. In Swagger UI, select
+**Authorize** and enter the token to call protected endpoints.
 
 ## Authentication
 
@@ -187,8 +251,9 @@ record can be linked to at most one account.
 | `STAFF` | View, create, and update academic records; cannot delete them or create user accounts. |
 | `STUDENT` | Browse departments, programs, and courses; view their own student record and enrollments; enroll themselves and drop their own enrollment. |
 
-Only `ADMIN` and `STAFF` can complete an enrollment. Student ownership is
-checked when accessing an individual student record or enrollment.
+Only `ADMIN` and `STAFF` can complete an enrollment. Students can list their own
+enrollments. If a student supplies another student's ID when listing
+enrollments, the request is denied.
 
 Requests without valid authentication receive `401`. Authenticated users
 without the necessary permission receive `403`. Other supported errors include
@@ -196,6 +261,31 @@ without the necessary permission receive `403`. Other supported errors include
 
 The Actuator health endpoint is currently not exposed through the application's
 security rules.
+
+## Pagination
+
+List endpoints return paginated results.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `page` | `0` | Zero-based page index. |
+| `size` | `20` | Number of items per page; the application limit is 100. |
+| `sort` | `id,asc` | A supported field and direction, such as `name,asc`. |
+
+For example:
+
+```http
+GET /api/v1/departments?page=0&size=10&sort=name,asc
+Authorization: Bearer <access-token>
+```
+
+The response includes `content`, `totalElements`, `totalPages`, and other page
+metadata. Supported sort fields depend on the endpoint. An unsupported sort
+field returns `400`.
+
+Programs can be filtered by `departmentId`; courses and students can be
+filtered by `programId`; enrollments can be filtered by `studentId`,
+`courseId`, or both. Access rules still apply to filtered results.
 
 ## API Endpoints
 
@@ -224,6 +314,7 @@ security rules.
 | `PUT` | `/api/v1/students/{id}` | Update a student |
 | `DELETE` | `/api/v1/students/{id}` | Delete a student |
 | `POST` | `/api/v1/enrollments` | Enroll a student in a course |
+| `GET` | `/api/v1/enrollments` | List enrollments with optional filters |
 | `GET` | `/api/v1/enrollments/{id}` | Retrieve an enrollment |
 | `POST` | `/api/v1/enrollments/{id}/drop` | Drop an enrollment |
 | `POST` | `/api/v1/enrollments/{id}/complete` | Complete an enrollment |
@@ -237,6 +328,15 @@ See the roles table above for access restrictions. Unspecified routes are denied
 - **Integration tests:** PostgreSQL and Flyway using Testcontainers.
 - **Security tests:** authentication, roles, ownership, and protected requests.
 - **Concurrency tests:** selected database constraints and state transitions.
+
+## Future Improvements
+
+- Refresh tokens and logout.
+- Rate limiting for the login endpoint.
+- An endpoint for users to view their own account.
+- Additional search and filtering.
+- Audit logging for administrative actions.
+- CORS configuration for a frontend.
 
 ## License
 
