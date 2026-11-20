@@ -1,52 +1,43 @@
 # University Management System
 
-A university management REST API built as a portfolio project using Java, Spring Boot, and PostgreSQL.
-
-Department management is currently implemented. Program management, courses, and enrollment are planned.
+A backend REST API for managing university departments, programs, courses,
+students, and enrollments. Built as a portfolio project with Java and Spring Boot.
 
 ## Current Features
 
-- Create a department.
-- Retrieve a department by ID.
-- List all departments.
-- Validate required fields and field lengths.
-- Enforce unique department codes in PostgreSQL.
-- Translate duplicate-code conflicts into HTTP `409`, including concurrent creation attempts.
-- Return structured errors for supported Department validation and lookup failures.
+- Manage departments, programs, courses, and students.
+- Enroll students in courses and retrieve individual enrollments.
+- Drop or complete enrollments with controlled status transitions.
+- Prevent duplicate enrollments and protect referenced records from deletion.
+- Authenticate users with JWT access tokens.
+- Restrict API access by role and check ownership for student data.
+- Apply database migrations with Flyway.
+- Run automated unit, controller, PostgreSQL integration, and concurrency tests.
 
 ## Tech Stack
 
-- Java 25 target
+- Java 25
 - Spring Boot 4.1.1
-- Spring Web MVC
+- Spring Web MVC and Spring Security
 - Spring Data JPA and Hibernate
 - PostgreSQL 18
 - Flyway
-- JUnit and Mockito
-- MockMvc
-- Testcontainers 2
-- Maven with Maven Wrapper
+- JWT
+- JUnit, Mockito, MockMvc, and Testcontainers
+- Maven Wrapper
 - GitHub Actions
 
 ## Prerequisites
 
-- JDK 25 to match the CI configuration.
-- Docker Desktop, or a compatible Docker environment, running Linux containers.
-- Git.
+- JDK 25
+- Docker Desktop, or a compatible Docker environment with Linux containers
+- Git
 
-Check the Java version Maven actually uses:
+Check the Java version used by Maven:
 
 ```powershell
 .\mvnw.cmd -version
 ```
-
-On Linux or macOS:
-
-```bash
-./mvnw -version
-```
-
-The project targets Java 25. Maven's runtime JDK is determined by your local environment, including `JAVA_HOME`.
 
 ## Getting Started
 
@@ -57,280 +48,196 @@ git clone https://github.com/BoDe-117/university-management-system.git
 cd university-management-system
 ```
 
-### 2. Start the development database
+### 2. Start PostgreSQL
 
 ```bash
 docker compose up -d
 ```
 
-The development database uses:
+The local development database uses:
 
 | Setting | Value |
 |---------|-------|
-| PostgreSQL image | `postgres:18` |
 | Database | `ums_dev` |
 | Username | `ums_user` |
 | Password | `ums_pass` |
 | Host port | `5432` |
 
-These credentials are local development defaults. Do not reuse them for a production deployment.
+These credentials are for local development only. Do not reuse them in production.
 
-Flyway applies database migrations when the application starts. Hibernate validates that the database schema matches the entity mappings.
+Flyway applies migrations when the application starts. Hibernate validates the
+database schema against the entity mappings.
 
-### 3. Run the application
+### 3. Set a JWT secret
 
-Windows PowerShell:
+The application requires `JWT_SECRET`: a Base64-encoded secret containing at
+least 32 random bytes. Keep the real secret outside the repository and do not
+share it.
+
+For a temporary local PowerShell session:
+
+```powershell
+$jwtKeyBytes = New-Object byte[] 32
+$jwtRandom = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$jwtRandom.GetBytes($jwtKeyBytes)
+$jwtRandom.Dispose()
+$env:JWT_SECRET = [Convert]::ToBase64String($jwtKeyBytes)
+```
+
+This value lasts only for the current terminal session. Changing the secret
+invalidates previously issued tokens. For a deployment, provide a securely
+stored, stable secret through the deployment environment.
+
+### 4. Create the first administrator
+
+The `bootstrap-admin` profile creates an administrator only if one does not
+already exist. It is disabled during normal startup.
+
+In the same PowerShell session, set a username and enter a password securely:
+
+```powershell
+$env:BOOTSTRAP_ADMIN_USERNAME = Read-Host "Administrator username"
+$adminSecurePassword = Read-Host "Administrator password" -AsSecureString
+$adminPasswordPointer = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($adminSecurePassword)
+
+try {
+    $env:BOOTSTRAP_ADMIN_PASSWORD = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($adminPasswordPointer)
+}
+finally {
+    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($adminPasswordPointer)
+}
+```
+
+Use a password of at least 12 characters and no more than 72 UTF-8 bytes.
+
+Start the application with the bootstrap profile:
+
+```powershell
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=bootstrap-admin"
+```
+
+When the log confirms that the administrator was created, stop the application
+with `Ctrl+C`, then remove the bootstrap credentials from the terminal session:
+
+```powershell
+Remove-Item Env:BOOTSTRAP_ADMIN_USERNAME -ErrorAction SilentlyContinue
+Remove-Item Env:BOOTSTRAP_ADMIN_PASSWORD -ErrorAction SilentlyContinue
+Remove-Variable adminSecurePassword, adminPasswordPointer -ErrorAction SilentlyContinue
+```
+
+Run the bootstrap profile only for initial setup. Start the application
+normally afterward, without that profile. If an administrator already exists,
+the bootstrap operation skips account creation.
+
+Environment variables are visible to the application process. Use a secure
+secret-management mechanism for deployments.
+
+### 5. Run the application normally
+
+In the same terminal session, with `JWT_SECRET` set:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
-Linux or macOS:
+The API listens on `http://localhost:8081`. Running from an IntelliJ run
+configuration requires setting `JWT_SECRET` in that configuration as well.
 
-```bash
-./mvnw spring-boot:run
-```
+### 6. Run tests
 
-The application runs on port `8081`.
-
-Open the health endpoint:
-
-[http://localhost:8081/actuator/health](http://localhost:8081/actuator/health)
-
-A healthy application returns:
-
-```json
-{
-  "status": "UP"
-}
-```
-
-## Running Tests
-
-Keep Docker running for the integration tests.
-
-Windows PowerShell:
+Start Docker Desktop, then run:
 
 ```powershell
-.\mvnw.cmd clean test
+.\mvnw.cmd "-DJWT_SECRET=MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=" clean test
 ```
 
-Linux or macOS:
+The value in this command is a public **test-only key**. Never use it for a
+real deployment. GitHub Actions also uses a separate test configuration.
 
-```bash
-./mvnw clean test
-```
+## Authentication
 
-This runs the service, controller, and PostgreSQL integration tests.
-
-Integration tests start an isolated PostgreSQL container with a dynamically assigned host port. They do not require the development database started by `docker compose up -d`.
-
-### Run individual test classes
-
-Windows PowerShell:
-
-```powershell
-.\mvnw.cmd "-Dtest=DepartmentServiceTest" test
-.\mvnw.cmd "-Dtest=DepartmentControllerTest" test
-.\mvnw.cmd "-Dtest=DepartmentIntegrationTest" test
-```
-
-Linux or macOS:
-
-```bash
-./mvnw -Dtest=DepartmentServiceTest test
-./mvnw -Dtest=DepartmentControllerTest test
-./mvnw -Dtest=DepartmentIntegrationTest test
-```
-
-Service and controller tests do not require Docker.
-
-### Testing Strategy
-
-- **Service unit tests:** verify business rules, response mapping, and exception handling using a mocked repository.
-- **Controller tests:** verify HTTP status codes, the creation `Location` header, response bodies, and invalid request handling using MockMvc.
-- **Integration tests:** verify application startup, migrations, persistence, and duplicate handling against PostgreSQL through the Spring-managed service.
-
-The concurrency test coordinates two requests so both observe an unused code before attempting insertion. It checks that one succeeds, one produces a domain conflict, and only one row is stored.
-
-A duplicate-key warning in the database logs is expected during that test.
-
-## Continuous Integration
-
-The GitHub Actions workflow is configured to run the Maven test suite on:
-
-- Pull requests targeting `main`.
-- Pushes to `main`.
-
-CI uses Java 25 on an Ubuntu runner.
-
-Check the [Actions page](https://github.com/BoDe-117/university-management-system/actions) for the latest run results.
-
-## Department API
-
-Base URL: `http://localhost:8081`
-
-| Method | Endpoint | Description | Success |
-|--------|----------|-------------|---------|
-| `POST` | `/api/v1/departments` | Create a department | `201 Created` |
-| `GET` | `/api/v1/departments/{id}` | Retrieve a department | `200 OK` |
-| `GET` | `/api/v1/departments` | List departments | `200 OK` |
-
-### Request Validation
-
-| Field | Rules |
-|-------|-------|
-| `code` | Required, not blank, maximum 20 characters |
-| `name` | Required, not blank, maximum 150 characters |
-
-Department codes must be unique. The current implementation stores codes as supplied, without trimming or case normalization.
-
-### Create a Department
+### Log in
 
 ```http
-POST /api/v1/departments HTTP/1.1
-Host: localhost:8081
+POST /api/v1/auth/login
 Content-Type: application/json
 
 {
-  "code": "CS",
-  "name": "Computer Science"
+  "username": "your-username",
+  "password": "your-password"
 }
 ```
 
-Example response headers:
+A successful response contains an `accessToken` and the token type `Bearer`.
+Access tokens expire after 15 minutes. Send the token with protected requests:
 
 ```http
-HTTP/1.1 201 Created
-Location: /api/v1/departments/bef682f0-7009-4b6a-88b9-0b31dda41a9f
-Content-Type: application/json
+Authorization: Bearer <access-token>
 ```
 
-Example response body:
+Only an administrator can create accounts through `POST /api/v1/users`.
+Student accounts must be linked to an existing student record. A student
+record can be linked to at most one account.
 
-```json
-{
-  "id": "bef682f0-7009-4b6a-88b9-0b31dda41a9f",
-  "code": "CS",
-  "name": "Computer Science",
-  "createdAt": "2026-09-03T12:58:08.879Z",
-  "updatedAt": "2026-09-03T12:58:08.879Z"
-}
-```
+## Roles and Access
 
-IDs and timestamps are generated; actual values will differ.
+| Role | Access |
+|------|--------|
+| `ADMIN` | Manage academic records and user accounts, including deletion. |
+| `STAFF` | View, create, and update academic records; cannot delete them or create user accounts. |
+| `STUDENT` | Browse departments, programs, and courses; view their own student record and enrollments; enroll themselves and drop their own enrollment. |
 
-### Retrieve a Department
+Only `ADMIN` and `STAFF` can complete an enrollment. Student ownership is
+checked when accessing an individual student record or enrollment.
 
-Use the ID returned by the creation endpoint:
+Requests without valid authentication receive `401`. Authenticated users
+without the necessary permission receive `403`. Other supported errors include
+`400` for invalid input, `404` for a missing resource, and `409` for conflicts.
 
-```http
-GET /api/v1/departments/bef682f0-7009-4b6a-88b9-0b31dda41a9f HTTP/1.1
-Host: localhost:8081
-```
+The Actuator health endpoint is currently not exposed through the application's
+security rules.
 
-An existing department returns `200` with a department response object. A missing department returns `404`.
+## API Endpoints
 
-### List Departments
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/v1/auth/login` | Authenticate and receive a token |
+| `POST` | `/api/v1/users` | Create an account; administrator only |
+| `POST` | `/api/v1/departments` | Create a department |
+| `GET` | `/api/v1/departments` | List departments |
+| `GET` | `/api/v1/departments/{id}` | Retrieve a department |
+| `PUT` | `/api/v1/departments/{id}` | Update a department |
+| `DELETE` | `/api/v1/departments/{id}` | Delete a department |
+| `POST` | `/api/v1/programs` | Create a program |
+| `GET` | `/api/v1/programs` | List programs; optionally filter by `departmentId` |
+| `GET` | `/api/v1/programs/{id}` | Retrieve a program |
+| `PUT` | `/api/v1/programs/{id}` | Update a program |
+| `DELETE` | `/api/v1/programs/{id}` | Delete a program |
+| `POST` | `/api/v1/courses` | Create a course |
+| `GET` | `/api/v1/courses` | List courses; optionally filter by `programId` |
+| `GET` | `/api/v1/courses/{id}` | Retrieve a course |
+| `PUT` | `/api/v1/courses/{id}` | Update a course |
+| `DELETE` | `/api/v1/courses/{id}` | Delete a course |
+| `POST` | `/api/v1/students` | Create a student |
+| `GET` | `/api/v1/students` | List students; optionally filter by `programId` |
+| `GET` | `/api/v1/students/{id}` | Retrieve a student |
+| `PUT` | `/api/v1/students/{id}` | Update a student |
+| `DELETE` | `/api/v1/students/{id}` | Delete a student |
+| `POST` | `/api/v1/enrollments` | Enroll a student in a course |
+| `GET` | `/api/v1/enrollments/{id}` | Retrieve an enrollment |
+| `POST` | `/api/v1/enrollments/{id}/drop` | Drop an enrollment |
+| `POST` | `/api/v1/enrollments/{id}/complete` | Complete an enrollment |
 
-```http
-GET /api/v1/departments HTTP/1.1
-Host: localhost:8081
-```
+See the roles table above for access restrictions. Unspecified routes are denied.
 
-Returns `200` with a JSON array of department response objects. If no departments exist, the response is:
+## Testing Strategy
 
-```json
-[]
-```
+- **Unit tests:** business rules with mocked dependencies.
+- **Controller tests:** HTTP responses and validation using MockMvc.
+- **Integration tests:** PostgreSQL and Flyway using Testcontainers.
+- **Security tests:** authentication, roles, ownership, and protected requests.
+- **Concurrency tests:** selected database constraints and state transitions.
 
-## Error Responses
+## License
 
-The explicitly handled Department errors share these fields:
-
-- `timestamp`
-- `status`
-- `error`
-
-Field-validation errors also include `fieldErrors`.
-
-Example validation response:
-
-```json
-{
-  "timestamp": "2026-09-03T13:01:47.242Z",
-  "status": 400,
-  "error": "Validation failed",
-  "fieldErrors": {
-    "code": "Department code is required"
-  }
-}
-```
-
-Example duplicate-code response:
-
-```json
-{
-  "timestamp": "2026-09-03T13:01:47.242Z",
-  "status": 409,
-  "error": "A department with code 'CS' already exists"
-}
-```
-
-| Status | Handled cases |
-|--------|---------------|
-| `400` | Field validation, malformed or missing request body, incompatible JSON values, invalid UUID |
-| `404` | Department not found |
-| `409` | Duplicate department code |
-
-Other framework errors and unexpected server failures are not currently covered by this custom error-format contract.
-
-## Project Structure
-
-```text
-src/
-├── main/
-│   ├── java/com/abdulrahman/university_management_system/
-│   │   ├── common/exception/
-│   │   ├── department/
-│   │   │   ├── controller/
-│   │   │   ├── dto/
-│   │   │   ├── entity/
-│   │   │   ├── exception/
-│   │   │   ├── repository/
-│   │   │   └── service/
-│   │   └── UniversityManagementSystemApplication.java
-│   └── resources/
-│       ├── application.properties
-│       └── db/migration/
-│           └── V1__create_departments.sql
-└── test/
-    └── java/com/abdulrahman/university_management_system/
-        └── department/
-            ├── controller/
-            ├── integration/
-            └── service/
-```
-
-## Design Decisions
-
-- Controllers handle HTTP requests and responses.
-- Services contain business rules and transaction boundaries.
-- Repositories provide database access.
-- DTOs keep the API separate from JPA entities.
-- Flyway owns schema changes; Hibernate validates the schema.
-- The database unique constraint protects department codes against concurrent inserts.
-- `saveAndFlush()` makes the insert occur inside the service's exception-handling block.
-- Constraint inspection identifies duplicate-code failures without querying a failed transaction.
-- JPA generates application-created UUIDs and timestamps. Database defaults also support inserts that omit those values outside JPA.
-
-## Planned Features
-
-- Program management and its relationship to Departments.
-- Course management.
-- Enrollment.
-- Authentication and role-based authorization.
-
-## Project Purpose
-
-This project is developed for learning and portfolio demonstration.
+This project is for educational and portfolio purposes.
