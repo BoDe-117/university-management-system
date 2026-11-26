@@ -329,6 +329,74 @@ See the roles table above for access restrictions. Unspecified routes are denied
 - **Security tests:** authentication, roles, ownership, and protected requests.
 - **Concurrency tests:** selected database constraints and state transitions.
 
+## AWS Deployment Demo
+
+The Spring Boot API was deployed on AWS in Singapore for a private portfolio
+demo. It runs in Docker on EC2 and connects to private Amazon RDS for PostgreSQL
+18.3. Access is through an authorized AWS Systems Manager Session Manager tunnel.
+
+```mermaid
+flowchart LR
+    Laptop[Demo laptop] -->|Session Manager port forwarding| SSM[AWS Systems Manager]
+    subgraph VPC[AWS VPC]
+        subgraph APP[Application subnet]
+            EC2[EC2 with Docker and Spring Boot]
+        end
+        subgraph DB[Private DB subnet group]
+            RDS[Single-AZ RDS for PostgreSQL]
+        end
+        EC2 -->|PostgreSQL over TLS| RDS
+    end
+    SSM -->|App port 8080| EC2
+    EC2 -->|Retrieve two SecureString parameters| Store[SSM Parameter Store]
+```
+
+- The EC2 security group has no inbound rules. The instance uses no SSH key pair
+  and publishes the container port on the host loopback interface.
+- RDS allows PostgreSQL access from the application security group. The JDBC
+  connection uses `sslmode=verify-full` with the AWS regional CA bundle.
+- Terraform uses separate deployment roles for the network and RDS. The EC2
+  runtime role uses Session Manager and can retrieve the two application secrets
+  from Parameter Store.
+
+### Accessing the private demo
+
+With the AWS CLI, the Session Manager plugin, and an authorized AWS profile,
+start a tunnel and keep its terminal open:
+
+```bash
+aws ssm start-session \
+  --target "<instance-id>" \
+  --document-name AWS-StartPortForwardingSession \
+  --parameters 'portNumber=8080,localPortNumber=18080' \
+  --region ap-southeast-1 \
+  --profile "<profile>"
+```
+
+While the tunnel is open, the API documentation is available at
+`http://127.0.0.1:18080/v3/api-docs` and Swagger UI at
+`http://127.0.0.1:18080/swagger-ui.html`.
+
+### Verified end-to-end flow
+
+1. Spring Boot connected to RDS and Flyway applied all six database migrations.
+2. An administrator signed in at `POST /api/v1/auth/login` and received a JWT.
+3. The JWT authorized `GET /api/v1/departments`, which returned HTTP `200`.
+4. The administrator created a demo department, program, course, and student.
+5. The administrator enrolled the student in the course. A separate
+   `GET /api/v1/enrollments/{id}` returned the same enrollment as `ENROLLED`.
+
+The first EC2 bootstrap stopped at an incorrect package name. The demo
+succeeded after correcting the package to `awscli-2` and rerunning setup on
+the same instance. The repository script includes that correction.
+
+### Cost and teardown
+
+The estimated EC2 and RDS baseline was about USD 46 per month if left running
+continuously, before credits and additional charges. Budget alerts provide
+notifications. Review Terraform teardown plans for the infrastructure and IAM
+roots, including RDS deletion protection and final snapshot settings.
+
 ## Future Improvements
 
 - Refresh tokens and logout.
